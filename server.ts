@@ -85,7 +85,7 @@ function stripFrontmatter(text: string): string {
 import { HANDLE, idList, parseTouches, readTasks } from './lib/read.js';
 import { createTask, setApproval, COLUMNS } from './lib/write.js';
 import { readFindings, writeFinding, setFindingStatus, findingsSummary } from './lib/findings.js';
-import { lab, connected as labConnected, needsLab } from './lib/lab.js';
+import { lab, connected as labConnected, needsLab, view as labView } from './lib/lab.js';
 import { readUsage, summarise, sourceBytes, record as recordUse } from './lib/usage.js';
 import { attention, caught, nextSkill } from './lib/attention.js';
 import { read as readProgress, clear as clearProgress } from './lib/progress.js';
@@ -1070,14 +1070,15 @@ const server = http.createServer(async (req, res) => {
      * карточка вместо пустой рамки, которая читается как поломка. */
     if (req.method === 'GET' && url.pathname === '/api/lab') {
       if (!labConnected()) return sendJSON(res, 200, needsLab('The model of this product'));
-      // Инструменты лаборатории, из которых рисуется смотрелка, ещё не выпущены.
-      // Врать про это нельзя: экран должен сказать, что модель есть, а показать
-      // её пока нечем, — а не нарисовать пустоту как будто продукт пуст.
-      return sendJSON(res, 200, {
-        connected: true, ...lab(), exists: false, pending: true,
-        error: 'Connected to the laboratory. The model is there; the tools that draw it here are '
-             + 'not released yet — ask your assistant over MCP in the meantime.',
-      });
+      /* Карта областей — то, с чего начинается смотрелка. Она приходит проекцией:
+       * имена, деловые слова, ручки. Ни идентификатора, ни устройства. */
+      const which = url.searchParams.get('project') || '';
+      const area = url.searchParams.get('area') || '';
+      const subject = url.searchParams.get('subject') || '';
+      const out = subject ? await labView('neighbours', { project: which, subject })
+        : area ? await labView('area', { project: which, area })
+        : await labView('map', which ? { project: which } : {});
+      return sendJSON(res, 200, { exists: !out.error, ...out });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/changes') {
@@ -2592,7 +2593,32 @@ const HTML = /* html */ `<!doctype html>
   .mrefresh{background:var(--panel2); border:1px solid var(--line2); color:var(--dim); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:15px}
   .mshare{width:auto; padding:0 12px; white-space:nowrap; letter-spacing:.06em}
   .mrefresh:hover{color:var(--txt)}
-  .lab-card{max-width:560px;margin:0 auto;text-align:left;padding:26px 28px;
+  .lab-fresh{font-family:var(--mono,monospace);font-size:11px;color:#62666d;margin-bottom:16px}
+.lab-fresh .stale{color:#8a5a11}
+.areas{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.areas.sm{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-top:10px}
+.area{position:relative;text-align:left;border:1px solid #dfe2e5;border-radius:2px;background:#fff;
+  padding:16px 18px;cursor:pointer;font:inherit;transition:border-color .16s}
+.area:hover{border-color:#0a0a0a}
+.area b{display:block;font-size:15px;margin-bottom:4px;padding-right:38px}
+.area p{font-size:12.5px;color:#62666d;line-height:1.5;margin:6px 0 0}
+.area-n{position:absolute;top:14px;right:16px;font-family:var(--mono,monospace);font-size:12px;color:#62666d}
+.area-c{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:10px;
+  font-family:var(--mono,monospace);font-size:10.5px;color:#62666d}
+.area.sm{padding:10px 12px;font-size:13px}
+.area.sm i{float:right;color:#62666d;font-style:normal;font-family:var(--mono,monospace);font-size:11px}
+.area-h{margin:16px 0 6px;font-size:20px}
+.area-h4{margin:22px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#62666d}
+.inside{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid #dfe2e5}
+.inside li{padding:10px 0;border-bottom:1px solid #f0f2f3}
+.inside li i{font-style:normal;font-family:var(--mono,monospace);font-size:10.5px;color:#62666d;
+  margin-left:8px;text-transform:uppercase;letter-spacing:.06em}
+.inside li p{margin:4px 0 0;font-size:12.5px;color:#62666d;line-height:1.5}
+.leans{margin-top:26px;font-size:13px}
+.leans h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#62666d;margin-bottom:8px}
+.leans div{padding:3px 0;color:#3a3e44}
+.leans i{color:#62666d;font-style:normal;font-family:var(--mono,monospace);font-size:11px}
+.lab-card{max-width:560px;margin:0 auto;text-align:left;padding:26px 28px;
   border:1px solid var(--line,#dfe2e5);border-radius:2px;background:#fff}
 .lab-card h3{margin:0 0 10px;font-size:17px}
 .lab-card p{margin:0 0 12px;line-height:1.55}

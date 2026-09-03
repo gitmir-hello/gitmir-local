@@ -1191,6 +1191,60 @@ function labCard(d){
     + '</p></div>';
 }
 
+/* Карта областей — то, с чего смотрелка начинается.
+ *
+ * Рисуется по проекции: имя, деловое слово, ручка. Ни идентификатора, ни
+ * устройства модели здесь нет и быть не может — их и не присылают. Клик по
+ * области открывает её содержимое тем же путём.
+ */
+function drawMap(view, d){
+  const areas=d.areas||[], links=d.links||[];
+  if(!areas.length){
+    view.innerHTML='<div class="model-empty"><b>Nothing has been read yet.</b><br>'
+      +'The laboratory has this repository but no model of it. Build one there, and this fills in.</div>';
+    return;
+  }
+  const head='<div class="lab-fresh">'+esc(d.freshness||'')
+    +(d.stale?' <b class="stale">STALE — the code has moved since</b>':'')+'</div>';
+  const cards=areas.map(a=>{
+    const counts=Object.entries(a.counts||{})
+      .map(([w,n])=>'<span>'+n+' '+esc(w)+(n===1?'':'s')+'</span>').join('');
+    return '<button class="area" data-area="'+esc(a.handle||a.name)+'">'
+      +'<b>'+esc(a.name)+'</b>'
+      +'<span class="area-n">'+a.total+'</span>'
+      +(a.description?'<p>'+esc(a.description)+'</p>':'')
+      +'<div class="area-c">'+counts+'</div></button>';
+  }).join('');
+  const leans=links.length
+    ? '<div class="leans"><h4>Which leans on which</h4>'
+      +links.slice(0,12).map(l=>'<div>'+esc(l.from)+' → '+esc(l.to)+' <i>'+l.weight+'</i></div>').join('')
+      +'</div>' : '';
+  view.innerHTML=head+'<div class="areas">'+cards+'</div>'+leans;
+  for(const b of view.querySelectorAll('.area')) b.onclick=()=>openArea(view, b.dataset.area);
+}
+
+/* Внутрь одной области. Тем же запросом, той же проекцией. */
+async function openArea(view, which){
+  view.innerHTML='<div class="model-empty">Opening…</div>';
+  let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(selected)
+    +'&area='+encodeURIComponent(which))).json(); }
+  catch{ view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
+  if(d.error){ view.innerHTML='<div class="model-empty">'+esc(d.error)+'</div>'; return; }
+  const rows=(d.inside||[]).map(o=>'<li><b>'+esc(o.name)+'</b> <i>'+esc(o.kind)+'</i>'
+    +(o.description?'<p>'+esc(o.description)+'</p>':'')+'</li>').join('');
+  const out=(d.reaches||[]).map(r=>'<button class="area sm" data-area="'+esc(r.handle)+'">'
+    +esc(r.area)+' <i>'+r.links+'</i></button>').join('');
+  view.innerHTML='<button class="b sm quiet" id="backMap">← All areas</button>'
+    +'<h3 class="area-h">'+esc(d.name)+'</h3>'
+    +(d.description?'<p class="lead">'+esc(d.description)+'</p>':'')
+    +'<p class="mono-note">'+d.total+' thing'+(d.total===1?'':'s')
+    +(d.truncated?', showing the first '+(d.inside||[]).length:'')+'</p>'
+    +'<ul class="inside">'+rows+'</ul>'
+    +(out?'<h4 class="area-h4">Reaches into</h4><div class="areas sm">'+out+'</div>':'');
+  view.querySelector('#backMap').onclick=()=>loadModel(selected);
+  for(const b of view.querySelectorAll('.area')) b.onclick=()=>openArea(view, b.dataset.area);
+}
+
 async function loadModel(pathStr){
   const view=document.getElementById('modelView'); if(!view) return;
   const req = ++modelReq, wantSrc = modelSrc;   // this call's identity
@@ -1201,7 +1255,12 @@ async function loadModel(pathStr){
    * вместо пустой рамки, которая читается как поломка. */
   let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(pathStr))).json(); }
   catch{ if(req===modelReq) view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
-  if(req===modelReq && d && d.connected===false){ view.innerHTML=labCard(d); modelData=null; return; }
+  if(req!==modelReq) return;
+  if(d && d.connected===false){ view.innerHTML=labCard(d); modelData=null; return; }
+  if(d && d.error){ view.innerHTML='<div class="model-empty"><b>The laboratory could not answer.</b><br>'+esc(d.error)+'</div>'; modelData=null; return; }
+  modelData=d; modelFor=pathStr;
+  drawMap(view, d);
+  return;
   // Drop a superseded response: the user may have switched project OR source while
   // this was in flight, and a late answer must not overwrite the current model.
   if(req!==modelReq || selected!==pathStr || wantSrc!==modelSrc) return;
