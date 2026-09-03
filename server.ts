@@ -86,6 +86,7 @@ import { HANDLE, idList, parseTouches, readTasks } from './lib/read.js';
 import { createTask, setApproval, COLUMNS } from './lib/write.js';
 import { readFindings, writeFinding, setFindingStatus, findingsSummary } from './lib/findings.js';
 import { lab, connected as labConnected, needsLab, view as labView } from './lib/lab.js';
+import { installed as connectorInstalled, fetchConnector, run as runConnector } from './lib/connector.js';
 import { readUsage, summarise, sourceBytes, record as recordUse } from './lib/usage.js';
 import { attention, caught, nextSkill } from './lib/attention.js';
 import { read as readProgress, clear as clearProgress } from './lib/progress.js';
@@ -1068,6 +1069,32 @@ const server = http.createServer(async (req, res) => {
      * вопрос. Разница в том, откуда берётся ответ: не с диска этой машины, а от
      * службы, которая модель строит и хранит. Пока ключа нет — одна честная
      * карточка вместо пустой рамки, которая читается как поломка. */
+    /* Коннектор: забрать и запустить.
+     *
+     * Для репозиториев, которые не могут покинуть эту машину. Обычный путь —
+     * подключить репозиторий в лаборатории, она сама его тянет; этот нужен там,
+     * где такого делать нельзя. */
+    if (req.method === 'GET' && url.pathname === '/api/connector') {
+      return sendJSON(res, 200, { installed: connectorInstalled(), lab: lab(),
+        connected: labConnected() });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/connector/fetch') {
+      return sendJSON(res, 200, await fetchConnector());
+    }
+    if (req.method === 'POST' && url.pathname === '/api/connector/run') {
+      const body = await readBody(req);
+      const p = String(body.path || '');
+      if (!p) return sendJSON(res, 400, { error: 'no path' });
+      /* Вывод идёт строкой за строкой в тот же ответ: сборка занимает минуты, и
+       * ждать её молча — то же самое, что не показывать ничего. */
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store',
+        'X-Accel-Buffering': 'no' });
+      const out = await runConnector({ project: p, as: String(body.as || ''),
+        onLine: (l: string) => { try { res.write(l + '\n'); } catch {} } });
+      if (!out.ok) { try { res.write('\n  ' + out.error + '\n'); } catch {} }
+      return res.end();
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/lab') {
       if (!labConnected()) return sendJSON(res, 200, needsLab('The model of this product'));
       /* Карта областей — то, с чего начинается смотрелка. Она приходит проекцией:
