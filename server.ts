@@ -2637,7 +2637,11 @@ const HTML = /* html */ `<!doctype html>
 .area-h{margin:16px 0 6px;font-size:20px}
 .area-h4{margin:22px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#62666d}
 .inside{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid #dfe2e5}
-.inside li{padding:10px 0;border-bottom:1px solid #f0f2f3}
+.inside li{padding:10px 0;border-bottom:1px solid #f0f2f3;cursor:pointer}
+.inside li:hover b{text-decoration:underline}
+.inside li .in{font-size:11px;color:#62666d}
+.kind{font-style:normal;font-family:var(--mono,monospace);font-size:11px;color:#62666d;
+  text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
 .inside li i{font-style:normal;font-family:var(--mono,monospace);font-size:10.5px;color:#62666d;
   margin-left:8px;text-transform:uppercase;letter-spacing:.06em}
 .inside li p{margin:4px 0 0;font-size:12.5px;color:#62666d;line-height:1.5}

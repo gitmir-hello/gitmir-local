@@ -1230,7 +1230,7 @@ async function openArea(view, which){
     +'&area='+encodeURIComponent(which))).json(); }
   catch{ view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
   if(d.error){ view.innerHTML='<div class="model-empty">'+esc(d.error)+'</div>'; return; }
-  const rows=(d.inside||[]).map(o=>'<li><b>'+esc(o.name)+'</b> <i>'+esc(o.kind)+'</i>'
+  const rows=(d.inside||[]).map(o=>'<li data-h="'+esc(o.handle)+'"><b>'+esc(o.name)+'</b> <i>'+esc(o.kind)+'</i>'
     +(o.description?'<p>'+esc(o.description)+'</p>':'')+'</li>').join('');
   const out=(d.reaches||[]).map(r=>'<button class="area sm" data-area="'+esc(r.handle)+'">'
     +esc(r.area)+' <i>'+r.links+'</i></button>').join('');
@@ -1243,6 +1243,33 @@ async function openArea(view, which){
     +(out?'<h4 class="area-h4">Reaches into</h4><div class="areas sm">'+out+'</div>':'');
   view.querySelector('#backMap').onclick=()=>loadModel(selected);
   for(const b of view.querySelectorAll('.area')) b.onclick=()=>openArea(view, b.dataset.area);
+  for(const li of view.querySelectorAll('.inside li')) li.onclick=()=>openThing(view, li.dataset.h, which);
+}
+
+/* Одна вещь и её связи — обе стороны.
+ *
+ * «На что опирается» видно и так, если читать код. «Кто опирается на это» — нет,
+ * и именно это ломается при правке. Поэтому вторая сторона названа отдельно, а
+ * не слита с первой в общий список соседей.
+ */
+async function openThing(view, handle, backTo){
+  view.innerHTML='<div class="model-empty">Opening…</div>';
+  let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(selected)
+    +'&subject='+encodeURIComponent(handle))).json(); }
+  catch{ view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
+  if(d.error){ view.innerHTML='<div class="model-empty">'+esc(d.error)+'</div>'; return; }
+  const side=(rows,none)=>rows.length
+    ? '<ul class="inside">'+rows.map(x=>'<li data-h="'+esc(x.handle)+'"><b>'+esc(x.name)+'</b> <i>'
+        +esc(x.kind)+'</i>'+(x.area?' <span class="in">in '+esc(x.area)+'</span>':'')+'</li>').join('')+'</ul>'
+    : '<p class="mono-note">'+none+'</p>';
+  view.innerHTML='<button class="b sm quiet" id="backArea">← Back</button>'
+    +'<h3 class="area-h">'+esc(d.name)+' <i class="kind">'+esc(d.kind)+'</i></h3>'
+    +(d.area?'<p class="mono-note">in '+esc(d.area)+'</p>':'')
+    +'<h4 class="area-h4">Depends on</h4>'+side(d.dependsOn||[],'nothing the model records')
+    +'<h4 class="area-h4">Depended on by</h4>'+side(d.dependedOnBy||[],'nothing the model records')
+    +(d.more?'<p class="mono-note">'+d.more+' more not shown</p>':'');
+  view.querySelector('#backArea').onclick=()=>backTo?openArea(view,backTo):loadModel(selected);
+  for(const li of view.querySelectorAll('.inside li')) li.onclick=()=>openThing(view, li.dataset.h, backTo);
 }
 
 async function loadModel(pathStr){
