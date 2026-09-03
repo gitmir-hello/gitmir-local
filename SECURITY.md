@@ -1,0 +1,166 @@
+# Security & privacy
+
+**Short version:** GitMir Local runs entirely on your machine and makes
+**no network calls to our servers**. No account, no telemetry, nothing uploaded.
+You can verify every claim on this page yourself in a few minutes — it is three
+files with zero runtime dependencies.
+
+This matters most for teams under an NDA: your source code and your product's
+business logic never sit on someone else's server, because they never leave your
+computer.
+
+## What touches the network
+
+By default, exactly two things — and neither is us:
+
+1. **The dashboard ↔ your browser — `localhost` only.** The tool serves a local
+   web UI on `http://localhost:4599`. Every request the page makes (`/api/...`)
+   goes to that local server on your own machine. Nothing leaves the loopback
+   interface.
+2. **Claude Code — talks to Anthropic under *your* account.** This tool's job is
+   to *launch* `claude` in your project folder. Once running, Claude Code
+   communicates with Anthropic using your own credentials/subscription — exactly
+   as it does when you run `claude` yourself in a terminal. **This tool adds
+   nothing to that and sees none of it.** If you trust Claude Code, nothing here
+   changes your exposure; if you don't, this tool doesn't increase it.
+
+A third connection exists **only if you turn on the Team bridge** (see below): an
+outbound WebSocket from the dashboard to the GitMir relay, opened when you enter a
+workspace key and click Connect. Until you do that, no `gitmir.com` endpoint — or
+any other third-party host — is ever contacted.
+
+## What this tool never does
+
+- **No telemetry, analytics, or phone-home.** There is no usage tracking of any
+  kind.
+- **No account, no sign-in, no cloud.** You never log in anywhere.
+- **Never uploads your data on its own.** Your code, your `.gitmir/` model, your
+  tasks, your project names and paths — none of it is sent anywhere unless you
+  explicitly opt into the Team bridge and *choose* to share a model or send a task
+  (see below). Nothing is uploaded in the background, ever.
+- **No third-party dependencies.** Zero npm packages (`node_modules` is empty). The
+  optional Team bridge needs Node 22+ for that built-in `WebSocket`; the dashboard
+  itself runs on Node 22.18+.
+  Everything it needs — ELK for diagram layout, the fonts — is vendored locally
+  under `vendor/`. There is no transitive code you can't see running behind your
+  back.
+
+## Verify it yourself
+
+You don't have to trust this page. Three independent ways to confirm it:
+
+1. **Read the code.** The whole tool is `server.ts` (the server), `relay.ts` (the
+   optional team bridge) and `public/app.js` (the browser UI) — about 4 200 lines,
+   no dependencies to audit behind them. Skim `server.ts`: every route is a local
+   file operation or an `open`/terminal launch. The only outbound HTTP client in
+   the codebase is the Preview tab, which fetches the URL **you** type, and the
+   bridge, which connects only after you enter a key.
+2. **Run it air-gapped.** Disconnect from the network and start it. The dashboard,
+   the model view, the task log — all keep working. (Only *launching Claude* needs
+   the network, because Claude talks to Anthropic — see above.)
+3. **Watch outbound connections.** Point Little Snitch / `lsof -i` / `tcpdump` at
+   the process. You will see loopback traffic and — only if you launch Claude —
+   connections from `claude` to Anthropic. Nothing to us.
+
+## Where your data lives (all local)
+
+- **Projects list:** `projects.json` in this folder.
+- **What the product does:** not here. It is built and kept by the laboratory, and
+  reached over MCP. Nothing about it is written to this machine — which is also why a
+  copy of it cannot be left behind on a laptop somebody stops using.
+- **Task log / queue:** `.claude/tasks.json` and `tasks/` inside your projects.
+- **Skills:** `skills/*.md` in this folder — plain text you can read and edit.
+
+## Team bridge (optional, opt-in)
+
+The dashboard has an optional **Team bridge** that connects your machine to your
+teammates' machines through the GitMir relay. It is **off until you turn it on** —
+you enter a workspace key, pick a project, and click Connect. It follows the same
+rule as everything else here: **the relay routes, it does not store.**
+
+- **While it is connected, your task queue is published to the room — automatically.**
+  This is the point of the bridge: your teammates (and, on a paid plan, the client
+  paying to follow along) see what you are working on and what is next. So be precise
+  about what that means. While the Team panel is connected, the tool watches
+  `tasks/todo`, `tasks/inprogress`, `tasks/verify` and `tasks/done` and sends the room
+  an updated list whenever a file changes: each task's **title, body text, status,
+  order and acceptance criteria**. It is your task notes that travel — **never your
+  source code**. Disconnect and it stops immediately.
+- **The model is shared when you ask, or automatically only at the `full` level.** A
+  snapshot of the laboratory leaves your machine when you click **Share model**, and —
+  if the project owner set mirroring to `full` — when the model changes. At any lower
+  level a snapshot is not sent.
+- **How much is *stored* is set by the project owner, and the tool always shows it.**
+  The Team panel states the current level in plain words — *"Nothing leaves this
+  machine"*, *"This project mirrors: the task queue"*, or *"…the task queue + the
+  product model"* — and updates the moment the owner changes it. You cannot change the
+  level from here; you can always see it, and you can always disconnect.
+- **Source code is never uploaded, at any level.** Not behind a flag, not as an
+  attachment. There is no code path in this tool that sends file contents from your
+  repository, and no endpoint on the server that would accept them.
+- Incoming items from teammates are written to *your* local disk — a shared model to
+  `.gitmir/shared/<teammate>/`, a task to `tasks/todo/` — so you read and act on them
+  in your own local instance.
+- **The relay stores no business logic.** It forwards live messages between the
+  online members of your team and keeps nothing at rest. Your code and your model
+  live on your machines; the relay's only job is connectivity. This is what makes
+  the bridge usable by teams under an NDA.
+- **The key is a local credential.** Your workspace key is entered in the UI and
+  kept **locally in your browser only** — it is never written into the repo, never
+  committed, and is sent to nowhere except the relay, as the connection credential.
+- **Incoming data from teammates is sandboxed.** A snapshot frame is now ignored
+  outright — nothing a peer sends can write a file describing your product. An
+  incoming task becomes a
+  file in `tasks/todo/` and is labelled as a request from a teammate — nothing runs
+  by itself; your local Claude only acts on it when you run the queue.
+- **Local API calls are same-origin only.** The dashboard refuses `/api/*` requests
+  carrying a foreign `Origin`, or a `Host` header that isn't localhost, so a web
+  page you happen to visit cannot drive this tool or turn the bridge on behind your
+  back (that also closes DNS-rebinding).
+- **Still zero-dependency.** The bridge uses Node's built-in WebSocket — no added
+  npm packages, nothing new to audit beyond the code in `relay.ts`.
+- **Gated by your plan, not by us watching you.** Access to the relay requires a
+  paid Team plan; a free key is refused at connect time. The gate is a plan check,
+  not surveillance — no usage is tracked.
+
+If you never open the Team panel, none of this runs and the tool behaves exactly as
+the sections above describe: your machine, and nothing outbound but Claude.
+
+## Share a map (the one place the model leaves on purpose)
+
+Everything above says your model stays on machines you control. **The Share button on
+the Model tab is the exception, and it only fires when you press it.** No timer, no file
+watcher, no automatic sync — one press, one snapshot.
+
+- **What leaves:** the contents of the laboratory — the whole model, as JSON. Nothing
+  else. **Your source code is not part of it and there is no code path here that reads
+  it.**
+- **Where it goes:** `POST https://ide.gitmir.com/api/share`, authenticated with your
+  workspace key as a header. Set `GITMIR_SHARE_URL` to publish to your own relay instead.
+- **What the recipient is shown:** a narrowed map — the areas, what a user can do, how
+  records move between states, the screens and the kinds of record. **Field names,
+  endpoints, server function names and the steps inside a flow are not rendered**, and
+  there is no endpoint that returns the uploaded model, so the link cannot be turned back
+  into a specification.
+- **Who can open it:** either anybody holding the link — the id is 128 random bits and
+  **the link is therefore a credential, so pass it the way you would a password** — or
+  only the email addresses you list, who must sign in. The page carries `noindex`.
+- **How long it lives:** 30 days by default. "Never" is a choice you make, not what you
+  get by leaving the field alone.
+- **How to kill it:** *Settings → Shared links* on ide.gitmir.com (`/settings#shared`). Revoking deletes the
+  stored model, not just the listing. That screen is on your account, signed in, on
+  purpose: creating a share is something a machine does, ending one is something a person
+  does where it can be audited.
+- **It costs nothing and needs no bridge.** Sharing a map works on a free account with no
+  connection running. The paid product is the live bridge, not showing somebody a picture.
+
+**If nothing may leave at all**, the same panel offers a self-contained HTML file — the
+model and the viewer in one document that opens with no server and no network. Nothing is
+uploaded on that path.
+
+## Reporting an issue
+
+Found something that contradicts the above, or a vulnerability? Please email
+**security@gitmir.com** (or open a private advisory on the repository). We take it
+seriously — the whole point of this tool is that you can trust it because you can
+check it.

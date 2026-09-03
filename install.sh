@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# GitMir Local — install in one line.
+#
+#   curl -fsSL https://ide.gitmir.com/install.sh | sh
+#
+# It clones the repository into ~/.gitmir/local and links a `gitmir`
+# command onto your PATH. Nothing is compiled and nothing is downloaded from a
+# package registry: Node runs the TypeScript directly, the diagram renderer is
+# written for this project, and the fonts are in the repository.
+#
+# Run it again to update — it pulls instead of re-cloning.
+#
+# Reading this before running it is the correct instinct, and this file is short
+# on purpose. Everything it touches:
+#   ~/.gitmir/local   the checkout
+#   ~/.local/bin/gitmir        a symlink to bin/gitmir inside that checkout
+
+# POSIX below this line, on purpose: the command on a landing page gets copied
+# as `| sh` about as often as `| bash`, and on most Linux /bin/sh is dash, which
+# has no pipefail and would abort on the very first line.
+set -eu
+if (set -o pipefail 2>/dev/null); then set -o pipefail; fi
+
+REPO="${GITMIR_REPO:-https://github.com/gitmir-hello/gitmir-local.git}"
+BRANCH="${GITMIR_BRANCH:-main}"
+DIR="${GITMIR_HOME:-$HOME/.gitmir/local}"
+OLD="$HOME/.gitmir/claude-control"    # where it lived before the project was renamed
+
+c()   { printf '\033[%sm%s\033[0m' "$1" "$2"; }
+say()  { printf '  %s\n' "$*"; }
+step() { printf '  %s %s\n' "$(c '0;36' '·')" "$*"; }
+die()  { printf '\n  %s %s\n\n' "$(c '1;31' '✕')" "$*" >&2; exit 1; }
+
+printf '\n  %s\n\n' "$(c '1;36' 'GitMir Local')"
+
+# --- node ---------------------------------------------------------------------
+# The one hard requirement, and the one that fails confusingly if unmet: below
+# 22.18 Node cannot strip TypeScript types, so the server dies on a type
+# annotation rather than saying what is wrong.
+command -v node >/dev/null 2>&1 || die "Node.js is not installed.
+    Get it from https://nodejs.org — version 22.18 or newer.
+    (macOS with Homebrew: brew install node)"
+
+NODEV="$(node -v | sed 's/^v//')"
+MAJ="${NODEV%%.*}"; MIN="$(printf '%s' "$NODEV" | cut -d. -f2)"
+if [ "$MAJ" -lt 22 ] || { [ "$MAJ" -eq 22 ] && [ "$MIN" -lt 18 ]; }; then
+  die "Node $NODEV is too old.
+    This runs TypeScript with no build step, which Node can do from 22.18.
+    Node 18 and 20 are both past end of life."
+fi
+step "Node $NODEV"
+
+# --- fetch --------------------------------------------------------------------
+# The project was called gitmir-claude-control and installed into .gitmir/claude-control.
+# Move an existing checkout rather than cloning a second copy beside it: git
+# redirects the old remote, so the moved one keeps updating without being touched.
+if [ -d "$OLD/.git" ] && [ ! -d "$DIR/.git" ]; then
+  step "Moving the earlier install: $OLD -> $DIR"
+  mkdir -p "$(dirname "$DIR")"
+  mv "$OLD" "$DIR"
+fi
+
+if [ -d "$DIR/.git" ]; then
+  step "Updating $DIR"
+  git -C "$DIR" fetch --quiet origin "$BRANCH"
+  git -C "$DIR" checkout --quiet "$BRANCH"
+  # Hard reset, not merge: this is an install script, and a half-merged checkout
+  # is a worse outcome than losing a local edit nobody meant to make here.
+  git -C "$DIR" reset --quiet --hard "origin/$BRANCH"
+elif command -v git >/dev/null 2>&1; then
+  step "Cloning into $DIR"
+  mkdir -p "$(dirname "$DIR")"
+  git clone --quiet --depth 1 --branch "$BRANCH" "$REPO" "$DIR"
+else
+  # No git: take the tarball. `gitmir update` will say to re-run this script.
+  step "No git — downloading a snapshot into $DIR"
+  command -v tar >/dev/null 2>&1 || die "Neither git nor tar is available. Install one of them."
+  TAR="${REPO%.git}/archive/refs/heads/$BRANCH.tar.gz"
+  TMP="$(mktemp -d)"
+  curl -fsSL "$TAR" -o "$TMP/src.tgz" || die "Could not download $TAR"
+  mkdir -p "$DIR"
+  tar -xzf "$TMP/src.tgz" -C "$DIR" --strip-components=1
+  rm -rf "$TMP"
+fi
+
+chmod +x "$DIR/bin/gitmir" 2>/dev/null || true
+
+# --- the command ---------------------------------------------------------------
+# A symlink rather than a copy, so `gitmir update` updates the launcher too.
+BIN="${GITMIR_BIN:-$HOME/.local/bin}"
+mkdir -p "$BIN"
+ln -sf "$DIR/bin/gitmir" "$BIN/gitmir"
+step "Linked $BIN/gitmir"
+
+ON_PATH=0
+case ":$PATH:" in *":$BIN:"*) ON_PATH=1 ;; esac
+
+# --- putting the command within reach ------------------------------------------
+# ~/.local/bin is not on PATH by default on macOS. Linking there and printing
+# "add this to your shell profile" means the next thing the user types — the
+# command this installer exists to provide — is not found. Do it for them, the
+# way every installer that works does, and say so.
+RC=""
+ADDED=0
+if [ "$ON_PATH" -eq 0 ]; then
+  case "${SHELL:-}" in
+    */zsh)  RC="$HOME/.zshrc" ;;
+    */bash) if [ -f "$HOME/.bash_profile" ]; then RC="$HOME/.bash_profile"; else RC="$HOME/.bashrc"; fi ;;
+    */fish) RC="$HOME/.config/fish/config.fish" ;;
+    *)      RC="$HOME/.profile" ;;
+  esac
+  LINE="export PATH=\"$BIN:\$PATH\""
+  case "$RC" in */config.fish) LINE="fish_add_path $BIN" ;; esac
+  # Once only: running the installer again must not stack the same line up.
+  if [ -f "$RC" ] && grep -Fq "$BIN" "$RC" 2>/dev/null; then
+    ADDED=2
+  else
+    mkdir -p "$(dirname "$RC")" 2>/dev/null || true
+    { printf '\n# GitMir Local\n%s\n' "$LINE" >> "$RC"; } 2>/dev/null && ADDED=1
+  fi
+fi
+
+# --- what to do next -----------------------------------------------------------
+printf '\n  %s\n\n' "$(c '1;32' 'Installed.')"
+
+if [ "$ON_PATH" -eq 0 ]; then
+  if [ "$ADDED" -eq 1 ]; then
+    printf '  Added %s to your PATH in %s.\n\n' "$BIN" "$RC"
+  elif [ "$ADDED" -eq 2 ]; then
+    printf '  %s is already in %s.\n\n' "$BIN" "$RC"
+  else
+    printf '  %s Could not write to %s. Add this line yourself:\n\n      export PATH="%s:$PATH"\n\n' \
+      "$(c '1;33' '!')" "$RC" "$BIN"
+  fi
+  printf '  %s\n\n' "$(c '1;37' 'Open a new terminal, or run this one line, and the command is ready:')"
+  printf '      %s\n\n' "$(c '0;36' "export PATH=\"$BIN:\$PATH\"")"
+  printf '      %s              start it and open the browser\n' "$(c '0;36' 'gitmir')"
+  printf '      %s     let your agent use the same model\n\n' "$(c '0;36' 'gitmir mcp add')"
+else
+  printf '      %s              start it and open the browser\n' "$(c '0;36' 'gitmir')"
+  printf '      %s     let your agent use the same model\n' "$(c '0;36' 'gitmir mcp add')"
+  printf '      %s       node, port, version, what is missing\n' "$(c '0;36' 'gitmir status')"
+  printf '      %s       pull the latest\n\n' "$(c '0;36' 'gitmir update')"
+fi
+
+say "The dashboard needs the $(c '1;37' 'claude') CLI on your PATH to run Claude for you."
+say "Nothing is uploaded anywhere and there is no telemetry — see SECURITY.md."
+printf '\n'

@@ -1,0 +1,37 @@
+# local runtime state (personal — never commit)
+# The usage ledger and the footprint cache are per-machine records of what was
+# asked here. They belong in the project they describe, not in this repository —
+# including the shipped example, where they would be one developer's test run.
+examples/*/.gitmir/usage.jsonl
+examples/*/.gitmir/footprint.json
+# Same for the change audit: whoever runs the example generates their own events,
+# and shipping one machine's queue history as though it were the example's is a lie
+# about a screen whose whole value is that the numbers are yours.
+examples/*/.gitmir/audit/
+# A status line about what an agent was doing on somebody's machine at some moment
+# is never worth committing, least of all into the shipped example.
+examples/*/.gitmir/progress.json
+projects.json
+team.json
+.claude/
+/.gitmir/
+
+# internal handoff notes / specs (reference the private dev repo, customers, contracts)
+TEAM_BRIDGE_TASKS.md
+TEAM_BRIDGE_ROUND_2.md
+SPEC.md
+
+# dependencies / env
+node_modules/
+.env
+.env.*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ...except the example project's own log — it is fixture data, not someone's
+# local history, and without it the example has no timeline to show.
+!examples/*/.claude/
+!examples/*/.claude/tasks.json

@@ -1,0 +1,29 @@
+{
+  "name": "gitmir-local",
+  "version": "1.0.0",
+  "description": "Local dashboard for running Claude Code across projects: models each product from the real code, turns any part of that model into an exact task, and verifies the work before calling it done.",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/gitmir-hello/gitmir-local",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gitmir-hello/gitmir-local.git"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^5.8.0"
+  },
+  "comments": {
+    "dependencies": "Empty, and staying that way. The diagram renderer is written for this project and the fonts are vendored under vendor/, so the tool has no supply chain to trust and works offline.",
+    "devDependencies": "typescript is for `npm run typecheck` only. Nothing is installed to RUN this \u2014 Node executes the .ts files directly, so `git clone && node server.ts` still needs nothing.",
+    "engines": "Node strips TypeScript types natively from 22.18. Node 18 and 20 are both past end of life.",
+    "bin": "Deliberately absent. `npm i -g` would put this under node_modules, and Node refuses to strip TypeScript types from there (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING) \u2014 so the install would look fine and the server would die on its first import. install.sh clones instead, which is why it exists."
+  }
+}

@@ -1,0 +1,21 @@
+# Third-party notices
+
+GitMir Local is licensed under AGPL-3.0, with a commercial license also
+available (see LICENSING.md). It bundles the following
+third-party components in `vendor/`, each distributed under its own license
+(mere aggregation — they are used unmodified). Their licenses continue to apply
+to those files.
+
+| Component | Version | License | File(s) |
+|-----------|---------|---------|---------|
+| [Onest](https://github.com/getflourish/Onest) font | — | [SIL Open Font License 1.1](https://openfontlicense.org/) | `vendor/fonts/*.woff2`, `vendor/fonts.css` |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) font | — | [SIL Open Font License 1.1](https://openfontlicense.org/) | `vendor/fonts/*.woff2`, `vendor/fonts.css` |
+
+The GITMIR wordmark and mark (`vendor/gitmir-wordmark.svg`, `vendor/gitmir-mark.svg`)
+are trademarks/brand assets of GITMIR and are **not** covered by the AGPL-3.0 grant
+for the rest of the project; they are included for use within this tool only.
+
+Fonts are served locally (a subset downloaded from Google Fonts, which distributes
+Onest and JetBrains Mono under the SIL OFL). If you prefer, remove `vendor/fonts/`
+and the `<link rel="stylesheet" href="/vendor/fonts.css">` line in `server.ts` — the
+UI falls back to system fonts.
