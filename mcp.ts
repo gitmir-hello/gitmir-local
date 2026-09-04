@@ -93,8 +93,9 @@ type ToolAnnotations = {
   openWorldHint: boolean;
 };
 
-// Reading the model: no writes, and the world is closed — the only thing touched is
-// this machine's own .gitmir/ folder. Repeating a read changes nothing.
+// Reading what is on disk: no writes at all — not even the usage journal, which is
+// why tools/call skips it for these — and the world is closed, since the only files
+// read are this machine's own. Repeating a read changes nothing.
 const READS: ToolAnnotations = {
   readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false,
 };
@@ -197,7 +198,19 @@ const TOOLS: Tool[] = [
        * работает у него. */
       lines.push('');
       if (labConnected()) {
-        lines.push('Laboratory: connected. The model of this product is built and kept there.');
+        /* «Ключ задан» и «лаборатория ответила» — разные новости.
+         *
+         * labConnected() отвечает только про ключ (см. lib/lab.js), а ни один
+         * инструмент отсюда в лабораторию пока не ходит. Поэтому здесь не может
+         * стоять «connected»: человек с опечаткой в ключе прочитал бы, что всё в
+         * порядке, и остался бы без единственного экрана, который объясняет, что
+         * делать. И адрес лаборатории называется в обеих ветках — иначе тот, кто
+         * уже подключился, знает, что модель есть, и не знает, куда за ней идти. */
+        lines.push('Laboratory: a key is set (GITMIR_LAB_KEY). Nothing here has asked the laboratory');
+        lines.push('yet, so this says the key is present, not that it was accepted.');
+        lines.push('');
+        lines.push(`The model of this product is built and kept there: ask it over MCP at ${lab().mcp}.`);
+        lines.push(`Keys are managed at ${lab().keys}.`);
         lines.push('');
         lines.push('Next: gitmir_skill("task-planner") writes tasks that carry their own checks, and');
         lines.push('gitmir_skill("task-log") keeps the record of what was done.');
@@ -224,9 +237,10 @@ const TOOLS: Tool[] = [
     annotations: READS,
     title: 'The GitMir skills and when to use one',
     description:
-      'List the GitMir skills — the written procedures for building the model, planning work that ' +
-      'carries its own checks, running the queue, auditing a running app, and working on inherited ' +
-      'code. Call this when you are about to do one of those things, then fetch the one you need ' +
+      'List the GitMir skills — the written procedures for turning a brief into a written ' +
+      'specification, planning work that carries its own checks, running the queue, auditing a ' +
+      'running app, reading the written rules against the code, and working on inherited code. ' +
+      'Call this when you are about to do one of those things, then fetch the one you need ' +
       'with gitmir_skill and follow it. Returns names and what each is for, not the text.',
     inputSchema: { type: 'object', properties: { ...PROJECT_ARG }, required: [] },
     run(_args: Record<string, unknown>, _project: string) {
@@ -269,12 +283,12 @@ const TOOLS: Tool[] = [
   {
     name: 'gitmir_queue',
     annotations: READS,
-    title: 'Planned work and its risk',
+    title: 'The planned work and its approvals',
     description:
-      'List the work planned for this project — the task files under tasks/ — with the model ' +
-      'objects each one touches, its risk level, and whether it has been approved. Call this when ' +
-      'the user asks what is queued, what is being worked on, what is risky, or what still needs ' +
-      'approval before it runs.',
+      'List the work planned for this project — the task files under tasks/ — with the handles ' +
+      'each one says it touches and whether it has been approved. Call this when the user asks ' +
+      'what is queued, what is being worked on, or what still needs approval before it runs. How ' +
+      'far a task actually reaches is answered by the laboratory, not by this server.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -288,15 +302,31 @@ const TOOLS: Tool[] = [
        * Раньше рядом с каждой задачей стоял риск, посчитанный по локальной модели.
        * Считать его здесь больше нечем и незачем: радиус — вопрос к лаборатории,
        * и она же на него отвечает. Задачи от этого не перестают быть задачами. */
-      let tasks = readTasks(project);
-      if (typeof args.column === 'string') tasks = tasks.filter((t) => t.col === args.column);
-      if (!tasks.length) {
+      /* Пустая очередь и пустая колонка — разные ответы.
+       *
+       * Проверка на пустоту стоит ДО фильтра: иначе вопрос «что в verify?» при
+       * четырёх задачах в todo возвращал isError и «задач нет вообще». Пустая
+       * колонка — это ответ, а не сбой, и isError на нём заставляет агента
+       * считать сломанным сервер, а не свою догадку. */
+      const all = readTasks(project);
+      if (!all.length) {
         return { text: `No task files under ${path.join(project, 'tasks')}. The task-planner skill writes them.`, isError: true };
       }
-      const L: string[] = [];
-      if (!labConnected()) {
-        L.push('(not connected to a laboratory — the queue is shown, the reach of each task is not)', '');
+      const col = typeof args.column === 'string' ? args.column : '';
+      const tasks = col ? all.filter((t) => t.col === col) : all;
+      if (!tasks.length) {
+        return { text: `Nothing in ${col}. The queue holds ${all.length} task(s) in the other columns — call this again without \`column\` to see them.` };
       }
+      const L: string[] = [];
+      /* Оговорка не снимается по факту ключа.
+       *
+       * Охват задачи считает лаборатория, и подключение само по себе его сюда не
+       * приносит: ниже как считались `touches` из самого файла задачи, так и
+       * считаются. Убрать строку по ключу значило бы сделать ответ не полнее, а
+       * менее честным. */
+      L.push(labConnected()
+        ? '(the queue is shown; how far each task reaches is answered by the laboratory, not from here)'
+        : '(no laboratory connected — the queue is shown, the reach of each task is not)', '');
       for (const t of tasks) {
         const tail = t.ids.length
           ? `  touches ${t.ids.length} part(s) of the product, ${t.declared ? 'declared' : 'inferred'}`
@@ -310,14 +340,15 @@ const TOOLS: Tool[] = [
   {
     name: 'gitmir_attention',
     annotations: READS,
-    title: 'What needs a person, derived from the model',
+    title: 'What needs a person right now',
     description:
-      'What this project needs attention on right now, worked out from the model itself: the code ' +
-      'having moved past it, recorded deviations whose files have since changed, planned work that ' +
-      'reaches further than its ticket says, tasks queued without approval, parts of the product ' +
-      'nobody owns. Call this at the start of a session instead of asking what to do, and after ' +
+      'What this project needs a person for right now, worked out from what is in the repository: ' +
+      'tasks queued without an approval, recorded deviations whose files have since changed, ' +
+      'deviations nobody has decided on, and whether anything has ever been checked against the ' +
+      'written rules. Call this at the start of a session instead of asking what to do, and after ' +
       'finishing work to see what it left behind. Each item says what it is, why it costs something ' +
-      'to ignore, and what closes it.',
+      'to ignore, and what closes it. What only the model can see — the code having moved past it, ' +
+      'parts of the product nobody owns — is answered by the laboratory instead.',
     inputSchema: { type: 'object', properties: { ...PROJECT_ARG } },
     run(_args: Record<string, unknown>, project: string) {
       /* Что требует человека — из того, что видно отсюда.
@@ -328,8 +359,15 @@ const TOOLS: Tool[] = [
        * одобрения, находки, чьи файлы с тех пор менялись — лежат в репозитории и
        * считаются здесь, как считались. */
       const tasks = readTasks(project);
+      /* `exists` — «лаборатория у этой машины есть», а не литерал.
+       *
+       * Здесь стояла константа false, и пункт «No laboratory is connected»
+       * печатался при выставленном ключе — в одной сессии с gitmir_setup,
+       * который тот же ключ видел правильно. Признак берётся из того же
+       * единственного места, что и во всём остальном клиенте. */
+      const hasLab = labConnected();
       const items = attention({
-        projectPath: project, model: {}, exists: false,
+        projectPath: project, model: {}, exists: hasLab,
         stale: false, staleFile: '', tasks,
       });
       const L: string[] = [];
@@ -346,12 +384,12 @@ const TOOLS: Tool[] = [
           L.push('');
         }
       }
-      const n = nextSkill({ exists: false, stale: false, model: {}, tasks,
+      const n = nextSkill({ exists: hasLab, stale: false, model: {}, tasks,
                             findings: readFindings(project).findings.length });
       L.push('');
       L.push(`If you are looking for what to do next: the ${n.name} procedure fits where this project is — ${n.why}`);
       L.push(`Fetch it in full with gitmir_skill("${n.name}").`);
-      if (!labConnected()) {
+      if (!hasLab) {
         L.push('');
         L.push(`Some of what needs a person is only visible from the model — the code having moved past `
              + `it, parts nobody owns. That lives in the laboratory: ${lab().home}`);
@@ -383,8 +421,8 @@ const TOOLS: Tool[] = [
         rule: { type: 'string', description: 'What the product is supposed to do, in the product\'s own words. Not "should validate input" — the actual rule.' },
         actual: { type: 'string', description: 'What the code does instead, naming the function or route you read it from.' },
         consequence: { type: 'string', description: 'What goes wrong for a person because of the gap. This is what makes it arguable.' },
-        source: { type: 'string', description: 'Where the rule is written: a spec section, a ticket, a decision. "ТЗ 5.2", "docs/spec.md#pricing".' },
-        touches: { type: 'array', items: { type: 'string' }, description: 'Model ids this sits on — the functions, endpoints or screens involved. This is what makes it visible on the diagrams.' },
+        source: { type: 'string', description: 'Where the rule is written: a spec section, a ticket, a decision. "spec 5.2", "docs/spec.md#pricing".' },
+        touches: { type: 'array', items: { type: 'string' }, description: 'The handles this sits on, as the laboratory issued them — "gm_" and ten characters. This is what makes it visible on the diagrams.' },
         kind: { type: 'string', enum: [...KINDS], description: 'contradicts-spec: does something else. not-implemented: does nothing. undefined: the spec never said. risk: works, will not survive production.' },
         severity: { type: 'string', enum: [...SEVERITIES] },
         readFrom: { type: 'array', items: { type: 'string' }, description: 'Repo-relative files you read this from. When one of them changes, the finding asks to be re-checked instead of quietly going stale.' },
@@ -403,10 +441,26 @@ const TOOLS: Tool[] = [
       ];
       if (f.consequence) L.push(`  costs   ${f.consequence}`);
       if (f.source) L.push(`  source  ${f.source}`);
-      L.push(`  on      ${f.touches.length ? f.touches.join(', ') : '(no model ids — it will not show on any diagram until it has some)'}`);
+      L.push(`  on      ${f.touches.length ? f.touches.join(', ') : '(no handles — it will not show on any diagram until it has some)'}`);
       L.push('');
       L.push('It is on the dashboard now, marked on every object it touches, and anyone planning a change that reaches them will be warned.');
-      if (!f.touches.length) L.push('Add `touches` with the ids from gitmir_navigate to make it visible where it matters.');
+      /* Совет должен указывать на то, что существует.
+       *
+       * Здесь стояло «take the ids from gitmir_navigate» — инструмента с таким
+       * именем среди одиннадцати нет, и агент, послушавшийся совета, получал
+       * -32602 ровно в тот момент, когда пытался дописать запись правильно. */
+      if (!f.touches.length) L.push('Add `touches` with the handles the laboratory issued ("gm_" and ten characters) to make it visible where it matters.');
+      /* Повторная находка на принятом дефекте не возвращается в открытые.
+       *
+       * writeFinding сохраняет прежний статус, и «It is on the dashboard now»
+       * читается как «она в списке открытых», а gitmir_findings показывает по ней
+       * ноль. Разницу видно только отсюда — здесь она и называется. */
+      if (r.updated && (f.status === 'accepted' || f.status === 'fixed')) {
+        L.push(`This finding is already marked ${f.status}`
+          + (f.decision ? ` (by ${f.decision.by}: ${f.decision.why})` : '')
+          + `, and stays that way — it will not appear among the open ones. Reopen it with `
+          + `gitmir_accept_finding(id: "${f.id}", status: "open") if it is live again.`);
+      }
       if (!f.readFrom.length) L.push('Add `readFrom` with the files you read, so the finding asks to be re-checked when they change.');
       return { text: L.join('\n') };
     },
@@ -503,8 +557,8 @@ const TOOLS: Tool[] = [
       'Write a task into this project\'s queue (tasks/todo/) so it can be run and checked ' +
       'later. Call this when the user asks to note something down, plan work, or turn a ' +
       'finding into work rather than doing it now. A task must carry the checks that prove ' +
-      'it worked — write them as numbered steps a person could follow. Naming the model ids ' +
-      'it will change is what lets its impact and risk be scored before it runs.',
+      'it worked — write them as numbered steps a person could follow. Naming the handles ' +
+      'it will change is what lets the laboratory say what else the change would reach.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -517,7 +571,7 @@ const TOOLS: Tool[] = [
         },
         touches: {
           type: 'array', items: { type: 'string' },
-          description: 'Model object ids this task will CHANGE (not the ones it reads), e.g. ["ent-order","sf-refund-order"].',
+          description: 'Handles this task will CHANGE (not the ones it reads), as the laboratory issued them, e.g. ["gm_261dcdf61e","gm_9b4c1a7f30"].',
         },
         context: { type: 'string', description: 'Optional: the slice of the product the runner needs.' },
       },
@@ -637,7 +691,12 @@ const TOOLS: Tool[] = [
 // commands — which is the right shape for these: nobody wants an agent deciding on
 // its own to re-model the repository.
 
-type SkillDef = { name: string; title: string; description: string; file: string };
+type SkillDef = {
+  name: string; title: string; description: string;
+  file: string;                 // resolved path on disk, not a bare name
+  strip?: boolean;              // the file carries frontmatter that must not reach an agent
+  prepend?: string;             // text the skill must be read with, from the registry
+};
 
 /**
  * Put this project on the dashboard's list. The dashboard owns projects.json,
@@ -673,40 +732,94 @@ async function registerWithDashboard(projectPath: string): Promise<string> {
   }
 }
 
-function skillDefs(): SkillDef[] {
+/* skills.json — список процедур этой установки, и он один на обе двери.
+ *
+ * Дашборд читал его и соблюдал stripFrontmatter и prepend; MCP-путь шёл мимо —
+ * сканировал каталог skills/ и отдавал файл как есть. Из-за этого через MCP
+ * агент получал YAML-шапку вместо инструкции, а у product-docs-spec терял
+ * обязательную преамбулу («писать в этом проходе только внутрь docs/») и
+ * принимался за код. Каталог остаётся запасным вариантом: установка без
+ * skills.json по-прежнему отдаёт то, что лежит в skills/. */
+function registeredSkills(): SkillDef[] {
+  let raw: unknown;
+  try { raw = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'skills.json'), 'utf8')); }
+  catch { return []; }
+  if (!Array.isArray(raw)) return [];
+  const out: SkillDef[] = [];
+  for (const s of raw as Record<string, unknown>[]) {
+    if (!s || typeof s.name !== 'string' || typeof s.file !== 'string') continue;
+    const file = path.isAbsolute(s.file) ? s.file : path.join(import.meta.dirname, s.file);
+    if (!fs.existsSync(file)) continue;             // a registered skill that is not installed is not on offer
+    const desc = typeof s.desc === 'string' && s.desc.trim() ? s.desc : describeSkillFile(file);
+    out.push({
+      name: s.name,
+      title: typeof s.title === 'string' && s.title ? s.title : s.name,
+      description: desc.replace(/\s+/g, ' ').slice(0, 300),
+      file,
+      strip: !!s.stripFrontmatter,
+      prepend: typeof s.prepend === 'string' ? s.prepend : '',
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function folderSkills(): SkillDef[] {
   const dir = path.join(import.meta.dirname, 'skills');
   let files: string[] = [];
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort(); } catch { return []; }
   const out: SkillDef[] = [];
   for (const f of files) {
+    const file = path.join(dir, f);
     const name = f.replace(/\.md$/, '');
-    let head = '';
-    try { head = fs.readFileSync(path.join(dir, f), 'utf8').slice(0, 4000); } catch { continue; }
-    // The description is what a client shows in its command list, so take the skill's
-    // own words: the frontmatter description where there is one, else the opening line.
-    let desc = '';
-    const fm = /^---\n([\s\S]*?)\n---/.exec(head);
-    if (fm) {
-      // A folded block runs until a line that starts back at column 0. The old
-      // pattern ended it at `$`, which with /m is the end of the FIRST line — so
-      // every multi-line description was cut to its opening clause.
-      const d = /^description:\s*(?:>-?[^\n]*\n((?:[ \t]+[^\n]*\n?)+)|([^\n]*))/m.exec(fm[1]);
-      if (d) desc = (d[1] || d[2] || '').split(/\r?\n/).map((s) => s.trim()).join(' ').trim();
-    }
-    if (!desc) {
-      const body = fm ? head.slice(fm[0].length) : head;
-      desc = body.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 2).join(' ');
-    }
-    out.push({
-      name, file: f, title: name,
-      description: desc.replace(/\s+/g, ' ').slice(0, 300),
-    });
+    out.push({ name, file, title: name, description: describeSkillFile(file) });
   }
   return out;
 }
 
+function skillDefs(): SkillDef[] {
+  const listed = registeredSkills();
+  return listed.length ? listed : folderSkills();
+}
+
+// The description is what a client shows in its command list, so take the skill's
+// own words: the frontmatter description where there is one, else the opening line.
+function describeSkillFile(file: string): string {
+  let head = '';
+  try { head = fs.readFileSync(file, 'utf8').slice(0, 4000); } catch { return ''; }
+  let desc = '';
+  const fm = /^---\n([\s\S]*?)\n---/.exec(head);
+  if (fm) {
+    // A folded block runs until a line that starts back at column 0. The old
+    // pattern ended it at `$`, which with /m is the end of the FIRST line — so
+    // every multi-line description was cut to its opening clause.
+    const d = /^description:\s*(?:>-?[^\n]*\n((?:[ \t]+[^\n]*\n?)+)|([^\n]*))/m.exec(fm[1]);
+    if (d) desc = (d[1] || d[2] || '').split(/\r?\n/).map((s) => s.trim()).join(' ').trim();
+  }
+  if (!desc) {
+    const body = fm ? head.slice(fm[0].length) : head;
+    desc = body.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 2).join(' ');
+  }
+  return desc.replace(/\s+/g, ' ').slice(0, 300);
+}
+
+// The frontmatter is a registry entry, not an instruction: served to an agent it
+// reads as the first paragraph of the skill. Same rule as the dashboard applies.
+function stripFrontmatter(text: string): string {
+  if (text.startsWith('---')) {
+    const end = text.indexOf('\n---', 3);
+    if (end !== -1) {
+      const after = text.indexOf('\n', end + 1);
+      if (after !== -1) return text.slice(after + 1).replace(/^\s+/, '');
+    }
+  }
+  return text;
+}
+
 function skillText(def: SkillDef): string {
-  return fs.readFileSync(path.join(import.meta.dirname, 'skills', def.file), 'utf8');
+  let text = fs.readFileSync(def.file, 'utf8');
+  if (def.strip) text = stripFrontmatter(text);
+  if (def.prepend) text = def.prepend + text;
+  return text;
 }
 
 // ---------- JSON-RPC over stdio ----------
@@ -738,18 +851,26 @@ async function handle(msg: any): Promise<void> {
         protocolVersion: agreed,
         capabilities: { tools: {}, prompts: {} },
         serverInfo: { name: NAME, title: 'GitMir Local', version: VERSION },
+        // Инструкции читаются клиентом один раз при старте, и всё, что в них
+        // обещано, агент считает доступным. Здесь были обещаны ответы «что от
+        // этого зависит», «докуда дотянется изменение», «насколько это рискованно»
+        // и признак STALE — под всё это инструментов больше нет, они уехали вместе
+        // с моделью. Осталось перечислить то, что этот сервер действительно
+        // делает, и назвать адрес, по которому спрашивают остальное.
         instructions:
-          'This project may carry a GitMir model — a map of what the product does, built from ' +
-          'its own code and linked by stable ids. Prefer these tools over reading files when the ' +
-          'question is about the product rather than a specific line: what something is, what ' +
-          'depends on it, what a change would reach, and how risky it is. Every answer states how ' +
-          'fresh the model is; if it says STALE, say so rather than presenting it as current. ' +
-          'If a tool answers that there is no model here, call gitmir_setup: it puts the project on ' +
-          'the dashboard, makes the task queue, and tells you what is missing. The model itself is ' +
-          'built and kept in the laboratory, not on this machine — so "no model here" is answered by ' +
-          'connecting to it, not by reading the repository file by file and writing one down. The written procedures ' +
-          'are gitmir_skills and gitmir_skill — fetch one and follow it yourself rather than asking ' +
-          'the user to paste anything. ' +
+          'This server answers about the work around a project on this machine: the task queue in ' +
+          'tasks/, the findings recorded against it, approvals, progress for the person watching ' +
+          'the dashboard, and the written procedures. It does NOT hold a model of the product — ' +
+          'what something is, what depends on it and how far a change would reach are answered by ' +
+          `the laboratory at ${lab().home} over this same protocol, on its own address (${lab().mcp}). ` +
+          'Do not try to rebuild that here by reading the repository file by file. ' +
+          'Start a session with gitmir_attention rather than asking the user what to do; call ' +
+          'gitmir_setup the first time you touch a project — it puts it on the dashboard, makes ' +
+          'the task queue, and says what is still missing. Record a place where the code does not ' +
+          'do what the product promises with gitmir_flag the moment you find it, rather than only ' +
+          'saying so in the conversation. The written procedures are gitmir_skills and ' +
+          'gitmir_skill — fetch one and follow it yourself rather than asking the user to paste ' +
+          'anything. ' +
           // Two procedures answer a request rather than a question, and an agent walks
           // straight past both: asked to plan, it starts editing. Say so here, where every
           // client reads it once at startup.
@@ -758,7 +879,8 @@ async function handle(msg: any): Promise<void> {
           'gitmir_skill("task-planner") and follow it instead of starting to edit code: they asked for ' +
           'the work written down with its own checks, not for the work done. When they ask you to RUN ' +
           'the queue, fetch gitmir_skill("task-runner"). ' +
-          'While you build or refresh the model, report each stage with gitmir_progress — and if you have ' +
+          'While you are on anything long — working the queue, auditing a running app, reading the ' +
+          'written rules against the code — report each stage with gitmir_progress, and if you have ' +
           'to stop and ask the user something, report `blocked` with the question in it, because they are ' +
           'watching a dashboard and cannot see this conversation.',
       });
@@ -780,7 +902,7 @@ async function handle(msg: any): Promise<void> {
       if (!def) return fail(id, -32602, `Unknown prompt: ${want}`);
       let body: string;
       try { body = skillText(def); } catch (e) {
-        return fail(id, -32603, `Could not read skill ${def.file}: ${e instanceof Error ? e.message : String(e)}`);
+        return fail(id, -32603, `Could not read skill ${path.basename(def.file)}: ${e instanceof Error ? e.message : String(e)}`);
       }
       const note = params && params.arguments && typeof params.arguments.note === 'string' ? params.arguments.note.trim() : '';
       const text = `Follow these instructions for the project at ${DEFAULT_PROJECT}.\n\n` +
@@ -818,7 +940,16 @@ async function handle(msg: any): Promise<void> {
          * же вопрос без модели. Считать это можно только по модели, а её здесь
          * больше нет — и сравнение переезжает туда, где она живёт. Остаётся
          * запись самого факта: что спросили и сколько отдали. */
-        if (!out.isError) {
+        /* Инструмент с readOnlyHint не пишет в чужой репозиторий. Точка.
+         *
+         * Журнал вёлся на каждый успешный вызов, включая пять инструментов,
+         * объявленных read-only, — и первый же вопрос «что в очереди?» заводил
+         * .gitmir/ в проекте, который человек только просматривал. Клиент вправе
+         * пропустить подтверждение, поверив подсказке; подсказка, которая
+         * подкрашивает правду, хуже отсутствующей — так сказано и там, где эти
+         * подсказки объявлены. Пишущие инструменты в журнал попадают как прежде,
+         * и дашборд по-прежнему записывает то, что спрашивают у него. */
+        if (!out.isError && !tool.annotations.readOnlyHint) {
           try {
             recordUse(project, {
               tool: name,

@@ -19,7 +19,7 @@ $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.MessageBox]::Show(
-        "Node.js was not found. Install Node.js 18 or newer (22+ for the Team bridge) from nodejs.org, then try again.",
+        "Node.js was not found. Install Node.js 22.18 or newer from nodejs.org, then try again.",
         "GitMir Local") | Out-Null
     exit 1
 }

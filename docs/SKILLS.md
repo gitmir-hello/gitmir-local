@@ -18,9 +18,13 @@ these files are read by teammates, clients, reviewers and the next session.
 ## Understanding what exists
 
 Reading a product and working out what it does is what the laboratory is for, and the
-procedures that do it are not in this repository. Your assistant asks it over MCP: what
-something is, what depends on it, what a change would reach. See
-[the MCP server](MCP.md).
+procedures that do it are not in this repository. Your assistant asks the laboratory
+directly over MCP: what something is, what depends on it, what a change would reach.
+
+Register its endpoint alongside the local one — `https://lab.gitmir.com/mcp`, with the
+key from [your account](https://lab.gitmir.com/account/access) as a bearer token. The
+[local MCP server](MCP.md) is a different server and answers different questions: the
+queue, the findings, the approvals in this repository.
 
 ## Deciding what to build
 

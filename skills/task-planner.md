@@ -50,12 +50,12 @@ Create `tasks/todo/NNN-<slug>.md` (zero-padded number prefix so they run in orde
 
     Type: build
     Change: refunds
-    Touches: ent-order, sf-refund-order, ev-order-refunded
+    Touches: gm_261dcdf61e, gm_00facddf0a, gm_be1601b763
 
     ## Context
     <the relevant slice of the product — ask the laboratory over MCP if one is connected:
-    the entities, fields, functions, routes, events, status flows and processes
-    this task touches, referenced by their ids/names, so the runner has everything
+    the data, the rules, the endpoints, the screens, the notifications and the status
+    changes this task touches, each named by its handle, so the runner has everything
     it needs without re-reading the whole repo>
 
     ## Task
@@ -90,21 +90,25 @@ Omit the line only if you genuinely cannot tell what the request was.
 
 ## The `Touches:` line
 
-List the ids of the model objects **this task will change** — not everything it
-reads. One line, comma-separated, ids exactly as they appear in
-the laboratory. Omit the line only when there is no laboratory connected.
+List the handles of the things **this task will change** — not everything it reads.
+One line, comma-separated. A handle is what the laboratory issues for a part of the
+product: `gm_` and ten characters, opaque on purpose. Copy it from the laboratory's
+answer exactly; never invent one, and never write a descriptive name in its place —
+a name that looks meaningful but resolves to nothing is worse than an empty line,
+because it reads as an estimate somebody checked. Omit the line only when there is no
+laboratory connected.
 
 This is what turns a queue into an impact estimate. Before the task runs, the
-interface walks those ids through the model and shows what else is downstream:
+interface walks those handles through the model and shows what else is downstream:
 which modules the change crosses, which processes and journeys run through it,
 which endpoints and screens sit on top, and what that scores as risk. Someone can
 then approve it — or split it — before any code is written.
 
-Get the distinction right: a task that reads `ent-user` to render a name and
-writes `ent-invoice` touches `ent-invoice`. Putting both in overstates the blast
+Get the distinction right: a task that reads the customer record to render a name and
+writes the invoice touches the invoice only. Putting both in overstates the blast
 radius, and an inflated radius trains people to ignore it.
 
-Without the line the interface falls back to every model id mentioned anywhere in
+Without the line the interface falls back to every handle mentioned anywhere in
 the file, and labels the result inferred. That is a worse estimate than one you
 write deliberately.
 
@@ -130,11 +134,11 @@ Rules for the steps:
 - **Cover the negative case too**, not just the happy path — the invalid input, the
   empty list, the unauthorised call.
 - **Cover what the change could break nearby.** Ask the laboratory what else
-  reads or writes the fields you touched, and add a step for it.
-- **If the task changes code, add a step for the description itself** — "the laboratory
-  describes the new field / route / transition after the next build, handles
-  unchanged, `index.json` refreshed". The model is what every later task is briefed from;
-  if it silently lags, every one of them is briefed from fiction.
+  reads or writes the data you touched, and add a step for it.
+- **If the task changes code, add a step for the description itself** — "ask the
+  laboratory to re-read the repository; it then describes the new field / route /
+  transition, and the handles are unchanged". The model is what every later task is
+  briefed from; if it silently lags, every one of them is briefed from fiction.
 - Mark a step `(manual)` when only a human can judge it. The runner will stop and
   ask rather than guess.
 - If a task genuinely cannot be verified by anything but a person, say so in the step
@@ -146,8 +150,8 @@ Rules for the steps:
   another, order them with the number prefix.
 - **Every task needs a `## Verify` section.** A task with no way to check it is not
   ready to run — a requirement you cannot check is a wish, not a task.
-- Ground the context in the real model/code — never invent. Prefer linking model
-  ids/names over pasting large chunks of code.
+- Ground the context in what the laboratory says and in the real code — never invent.
+  Prefer naming things by their handles over pasting large chunks of code.
 - Add standalone `verify` tasks at the points where a whole flow should be re-proven
   (after a group of related build tasks), not after every single one.
 - Only CREATE the files here; do not execute them (that is `task-runner`'s job).

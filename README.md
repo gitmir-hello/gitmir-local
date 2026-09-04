@@ -69,7 +69,7 @@ Allow a partial refund
 ```
 
 **Two areas. One journey. One lifecycle. Money in reach.**
-21 of 29 possible points — 72% of this product.
+Nine of the parts this product is made of, across two of its areas.
 
 > The ticket tells the agent what to change.
 > GitMir shows what the product says that change **means**.
@@ -77,31 +77,22 @@ Allow a partial refund
 A developer can implement the ticket exactly as written and still implement the wrong
 change for the product. So can an agent, faster.
 
-<img src="docs/img/impact-graph.jpg" alt="Changes, the areas they reach, and the user journeys running through those areas" width="900">
-
-**→ the laboratory** — every weight, the two-hop
-rule, and how to disagree with the number.
+**→ [the laboratory](https://lab.gitmir.com)** — where that second reading is worked
+out, what it is confident about, and how to disagree with it.
 
 ---
 
-## What it cost you to answer, measured
+## Every answer leaves a line you can read
 
-Open a project and the first screen is not a settings form. It is what the
-context is, what it replaced, and what it has caught:
+Open a project and the first screen is not a settings form. It is what needs a
+person, what has been caught, and what has been asked.
 
-<img src="docs/img/overview.png" alt="A project overview: 24.6x less read to answer, the object context against the source it came from, open deviations, and the record of what was asked" width="900">
+Every answer the MCP server serves leaves one line in `.gitmir/usage.jsonl`: when,
+which tool, what was asked, and how many bytes went back. Plain text, on your disk,
+appended and never sent.
 
-Every answer taken from the model — by your agent over MCP, or by you opening an
-object — leaves one line in `.gitmir/usage.jsonl`: what was asked, how big the
-answer was, and how big the files are that those objects live in.
-
-That second number is deliberately not a claim about what an agent "would have
-done". It is a fact about your repository: these objects live in these files, and
-the files are this size. On a real 6-area product, four answers came to 12 KB
-against 299 KB of source — and you can open the record and check every line.
-
-The record never leaves the machine. It is the file that lets you verify the
-no-telemetry claim rather than take it.
+That file is the point. "No telemetry" is a claim anybody can make; a log of every
+answer, on your own machine, is a claim you can check.
 
 ---
 
@@ -122,13 +113,18 @@ between `todo → in progress → verify → done`:
   ██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
   ■ First pass  2.7h · €231      ■ Rework  7.3h · €623
 
-FIRST-PASS RATIO       50%      ITERATIONS PER CHANGE  0.5
+FIRST-PASS RATIO       50%      ITERATIONS PER CHANGE  1.0
 REVIEW CYCLES            8      LATE DISCOVERIES         2
 
 WHERE THE TIME CONCENTRATES
   Search           4.8h after first pass · 2 changes
   Billing rules    2.3h after first pass · 1 change
 ```
+
+<sub>A worked example of the screen, not a reading of any project shipped here:
+<code>examples/refund-shop</code> has queued tasks but no history of moving them, and the
+tab says <em>not enough data</em> rather than inventing a number. Run it on a queue you
+have actually worked and the figures are yours.</sub>
 
 Every change carries **two prices** — the cyan half is the work, the red half is
 the cost of it not being right yet — and the same bar sits on each task card in the
@@ -144,9 +140,12 @@ would be the easiest place in this product to lie.
 Below four changes it says *not enough data* in words instead of showing a
 confident `0%`.
 
-**It cuts by area of the product, never by person.** There is no per-person number
+**It cuts by part of the product, never by person.** There is no per-person number
 in the screen, the API, the export, or `.gitmir/audit/events.jsonl` — which
 carries no name, no email and no machine. That is not a default; it is the design.
+The per-task and per-object cuts work from the queue alone; grouping those objects
+into areas is the one part that needs a laboratory, because that is where the
+areas are known.
 
 **→ [Every definition, and what each one refuses to claim](docs/CHANGE-AUDIT.md)**
 
@@ -168,7 +167,7 @@ already known in the code it is about to touch.
 not done because code was generated; it is done when the expected product behaviour is
 proven.
 
-> **Understand → Execute → Verify**, over one model that lives in the repository.
+> **Understand → Execute → Verify**, over one shared reading of the product.
 
 ---
 
@@ -208,14 +207,16 @@ here is answers — never a copy of the product to keep in step.
 | `gitmir update` | pull the latest, and restart if it was running |
 
 Want to look before pointing it at your own code? Add
-[`examples/refund-shop`](examples/refund-shop) — an invented shop with a model and two
-planned tasks. Every number in this README is that project.
+[`examples/refund-shop`](examples/refund-shop) — an invented shop with three tasks, two
+of them still planned.
 
 ---
 
 ## Five minutes on your own repository
 
-Build the model, then ask your agent these five questions:
+Connect a laboratory — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy the key
+from your account and export it as `GITMIR_LAB_KEY` — then ask your agent these five
+questions:
 
 1. What are the main business objects in this product?
 2. Pick one that matters. What depends on it — in both directions?
@@ -236,10 +237,10 @@ tasks/               work, its declared scope, its approval, its history
 ```
 
 That is all of it, and it is all plain text you can read, edit and commit. A task names
-the parts of the product it will touch by their **handles** — `gm_` and ten characters,
-issued by the laboratory. A handle points at something and says nothing else: not its
-kind, not its neighbours, not where it sits. Which is why the queue can live in a public
-repository while what it refers to does not.
+the parts of the product it will touch by their **handles** — opaque labels issued by the
+laboratory. A handle points at something and says nothing else: not its kind, not its
+neighbours, not where it sits. Which is why the queue can live in a public repository
+while what it refers to does not.
 
 What the laboratory adds is the other half of the sentence: what those handles are, what
 depends on them, and how far this change would really reach. That is the part nobody has
@@ -262,23 +263,25 @@ Then ask, in Claude Code, Cursor, or anything else that speaks
 [MCP](https://modelcontextprotocol.io):
 
 ```
-What depends on Refund?
-What breaks if I change Order.status?
-Which business rules govern cancellation?
-What should be verified for this task?
-Where does the code already not do what the spec says?
+What needs a person in this project right now?
+What is planned, and what has actually been approved to run?
+Where is the code already known not to do what the spec says?
+Record that this one is accepted, and by whom.
+Turn that finding into a task with checks that prove it.
 ```
 
-Same model, same relationships, no separate AI knowledge base. Your editor starts it as a
-subprocess over stdin/stdout — **no port, no network, and the dashboard does not need to be
-running.** Every reply states how fresh the model is, because there is no amber banner in
-somebody else's editor.
+Your editor starts it as a subprocess over stdin/stdout — **no port, nothing uploaded,
+and the dashboard does not need to be running.** It answers from `.gitmir/` and `tasks/`
+and opens no source file.
+
+The other half — what the product does, what depends on what, how far a change would
+reach — is the laboratory's own MCP endpoint, registered alongside this one.
 
 **→ [The MCP server](docs/MCP.md)** — eleven tools, and what each admits about its own
 behaviour.
 
 An agent that starts a session with `gitmir_attention` gets the list this screen shows —
-what has moved, what is unverified, what reaches further than its ticket says — with the
+what is unverified, what was queued without approval, what has stalled — with the
 procedure that closes each one. The system does the noticing; a person still does the
 deciding, which is the only version of "it runs itself" a governance tool can defend.
 
@@ -308,8 +311,6 @@ other view.
 ---
 
 ## Start with the problem you have
-
-<img src="docs/img/skills.png" alt="The skill cards, grouped by when you need them" width="960">
 
 | Your situation | The path |
 |---|---|
@@ -386,23 +387,22 @@ top level stays a size you can take in and the detail is one click inside it.
 
 <img src="docs/img/map-open.jpg" alt="An area opened in place, showing the objects, screens and endpoints inside it" width="920">
 
-<img src="docs/img/lifecycle.jpg" alt="An order lifecycle: states, the transitions between them, and a transition holding two effects" width="920">
-
 Alongside: **Queue** (`todo → in progress → verify → done`, each card carrying its risk and
 its approval) and **Preview** (open any URL, click an element, get a prompt naming it and
 the files it probably lives in).
 
 They are drawn on a canvas by a renderer written for this project — which is why `vendor/`
-holds fonts and nothing else, and why a map exported for someone to open is one self-contained
-file under a megabyte.
+holds nothing but the fonts and the GITMIR marks, and no diagram library at all.
 
 ---
 
 ## Local, and what that does and does not mean
 
-**GitMir uploads nothing.** The model, the dashboard, the MCP server and the task queue run
-on your machine and are stored in your project. No GitMir account is required for local
-use, and there is no GitMir telemetry — not reduced, not anonymised, none.
+**Your source code never leaves this machine.** The dashboard, the MCP server, the queue,
+the findings and the change audit run here and are stored in your project. There is no
+GitMir telemetry — not reduced, not anonymised, none — and no account is required for any
+of that. Set `GITMIR_LAB_KEY` and one more thing happens: questions about your product go
+to the laboratory and answers come back. Your code is in neither direction, on any path.
 ([SECURITY.md](SECURITY.md))
 
 **Your coding agent is a separate program with its own policy.** Claude Code, Cursor or
@@ -414,26 +414,26 @@ repository, over and over.
 **Requirements.** [Node.js](https://nodejs.org) 22.18+ — it runs the TypeScript directly, so
 `node server.ts` is the whole build system. The `claude` CLI on your PATH if you want the
 dashboard to run Claude for you. macOS · Windows · Linux. `dependencies` is empty and
-staying that way: the renderer is written for this and the fonts are vendored, so it works
-offline. Port 4599, or `GITMIR_PORT=4600`.
+staying that way: the renderer is written for this and the fonts are vendored, so there is
+nothing to fetch at install time or at run time. Port 4599, or `GITMIR_PORT=4600`.
 
 ---
 
 ## Local → Connect → Team → Enterprise
 
-**GitMir Local** — this repository. Free, open source, and not a trial: the model, every
-view, the MCP server, twelve skills, the task queue with risk and approval, and sharing a
-read-only map. One person on one machine, for as long as they like.
+**GitMir Local** — this repository. Free, open source, and not a trial: every view, the
+MCP server, eight skills, the task queue with risk and approval, the findings, and the
+change audit. One person on one machine, for as long as they like.
 
 The paid part begins at the second person — a shared model between machines, tasks that
 travel between teammates, their snapshots next to yours — and continues into adapting
 GitMir to an organisation's own products, agents and rules.
 **→ [ide.gitmir.com](https://ide.gitmir.com)**
 
-The model never leaves your machine either way. What travels between teammates is what you
-send: ids, counts, area names, decisions and who made them. The server routes messages and
-stores no business logic — which is why this engine is open in the first place, and why you
-can read exactly what it does.
+Your source code never leaves your machine either way. What travels between teammates is
+the task queue — each task's title, body, status, order and acceptance criteria — and
+nothing else. The relay routes messages and stores no business logic, which is why this
+client is open in the first place: you can read exactly what it sends.
 
 **License.** Dual: **[AGPL-3.0](LICENSE)** — fork it, use it for paid work, run it forever
 without us; distribute a modified version as a service and your source goes AGPL too. Or a

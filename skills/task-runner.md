@@ -42,10 +42,12 @@ first** (files are named with a sortable number prefix), and keep going:
    source of truth, and ask it to re-read the repository after any code change.
 5. **Hand off to verification.** Append a short `## Outcome` (what changed, files
    touched) and **move the file to `tasks/verify/`**. Never to `tasks/done/`. If the
-   task carries a `Touches:` line, correct it to the ids you actually changed — that
-   line is what the impact view reads, and a wrong one is worse than none.
+   task carries a `Touches:` line, correct it to the handles you actually changed —
+   that line is what the impact view reads, and a wrong one is worse than none.
 6. **Record what you touched.** When writing the task into `.claude/tasks.json`
-   (task-log), fill `touched` with the ids of the model objects you changed.
+   (task-log), fill `touched` with the handles of the things you changed — `gm_` and
+   ten characters, as the laboratory issued them. Never write a handle you did not
+   get from it.
 7. **Count what is left, out loud**, in one line — nothing more:
 
         queue: 4 todo, 2 verify — continuing

@@ -639,6 +639,47 @@ function projectRework(projectPath: string) {
   return val;
 }
 
+/**
+ * Which products the laboratory holds for this key — asked once, kept for seconds.
+ *
+ * The model is not on this machine, so "is this project mapped" is a question only
+ * the laboratory can answer. The home screen asks it for every tile on every
+ * refresh, which is why the answer is one call for the whole list rather than one
+ * per project, and why it is cached and given a deadline: a laboratory that is slow
+ * or unreachable must not hold up the first screen. An empty list means "nothing to
+ * match against", never "this project has no model" — that difference is what keeps
+ * a quiet network from relabelling every tile.
+ */
+let LAB_PROJECTS: { at: number; ids: string[] } = { at: 0, ids: [] };
+async function labProjectIds(): Promise<string[]> {
+  if (!labConnected()) return [];
+  if (LAB_PROJECTS.at && Date.now() - LAB_PROJECTS.at < 15000) return LAB_PROJECTS.ids;
+  const answer: any = await Promise.race([
+    labView('projects', {}),
+    new Promise((done) => setTimeout(() => done({}), 2000)),
+  ]);
+  LAB_PROJECTS = { at: Date.now(), ids: ((answer && answer.projects) || []).map((x: any) => x && x.id).filter(Boolean) };
+  return LAB_PROJECTS.ids;
+}
+
+/**
+ * Does the laboratory hold a product for this folder?
+ *
+ * A folder on disk and a product in the laboratory are named by people, separately,
+ * so they are matched the way the viewer matches them: on the folder name with the
+ * punctuation and case taken out, then on one name containing the other.
+ */
+function labHasProject(ids: string[], projectPath: string): boolean {
+  if (!ids.length) return false;
+  const norm = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const base = norm(projectPath.replace(/\/+$/, '').split('/').pop() || '');
+  if (!base) return false;
+  return ids.some((id) => {
+    const n = norm(id);
+    return !!n && (n === base || base.includes(n) || n.includes(base));
+  });
+}
+
 let VERSION_CACHE: string | null = null;
 /** The commit this dashboard is running, short. Empty when it was not installed from git. */
 function gitmirVersion(): string {
@@ -897,16 +938,25 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/projects') {
       // A tile that only says its own name is a folder shortcut. These three counts are
       // what makes the home screen worth looking at: whether the product has been mapped,
-      // whether work is waiting, and whether anything has happened here at all. All three
-      // are a directory listing, so this stays cheap enough to run on every refresh.
+      // whether work is waiting, and whether anything has happened here at all. The last
+      // two are a directory listing; the first is one cached question to the laboratory
+      // for the whole list, so this stays cheap enough to run on every refresh.
       const countIn = (dir: string): number => {
         try { return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).length; } catch { return 0; }
       };
+      /* Признак «размечен» — из лаборатории, а не с диска.
+       *
+       * Здесь стояла проверка локального файла модели. Модель этот тул больше не
+       * пишет и не читает: она в лаборатории. На свежей машине такой проверки нет
+       * ни у одного проекта, а у кого остался старый каталог — плитка светилась
+       * «Mapped» по мусору. Спрашиваем того, у кого модель есть, одним вызовом на
+       * весь список; лаборатория молчит — плитки просто не подтверждают разметку. */
+      const known = await labProjectIds();
       const list = loadProjects().map((p) => {
         const exists = fs.existsSync(p.path);
         let hasModel = false, todo = 0, verify = 0, done = 0, tasks = 0;
         if (exists) {
-          try { hasModel = fs.existsSync(path.join(p.path, '.gitmir', 'model', 'index.json')); } catch {}
+          hasModel = labHasProject(known, p.path);
           todo = countIn(path.join(p.path, 'tasks', 'todo'));
           verify = countIn(path.join(p.path, 'tasks', 'verify'));
           done = countIn(path.join(p.path, 'tasks', 'done'));
@@ -1307,25 +1357,41 @@ const server = http.createServer(async (req, res) => {
       /* Всё, что видно с этой машины. Модель сюда больше не входит.
        *
        * Она в лаборатории, и оттуда же придут числа про неё, когда у неё
-       * появится чем отвечать. До тех пор экран честно говорит, что не
-       * подключён, и показывает то, что и правда лежит здесь: задачи, находки,
-       * расход и размер исходников. */
+       * появится чем отвечать. Здесь остаётся то, что и правда лежит на диске:
+       * задачи, находки, расход и размер исходников. */
       const tasks = readTasks(p);
       const entries = readUsage(p, 300);
       const src = sourceBytes(p);
       const F = readFindings(p);
+      /* `exists` — «есть ли откуда взять модель», и ответ на это даёт ключ.
+       *
+       * Здесь стояло жёсткое `false`, и это был тупик: шаги пускают на этот экран
+       * ровно тогда, когда лаборатория подключена (шаг 3 — это `hasLab`), а экран
+       * первым же условием писал «карта пропала» и предлагал начать сначала —
+       * то есть вернуться на тот же экран. Ответ должен говорить о лаборатории то
+       * же, что говорят шаги рядом, иначе пульт спорит сам с собой. По той же
+       * причине `exists` идёт и в attention/nextSkill: с `false` первый пункт
+       * списка сообщал «лаборатория не подключена» подключённому человеку.
+       *
+       * Знает ли лаборатория именно этот продукт — вопрос смотрелки: она его
+       * задаёт и на него отвечает по-человечески, вместе со списком того, что
+       * там есть. Ставить тот же вопрос здесь значило бы вернуть тупик. */
+      const hasLab = labConnected();
       return sendJSON(res, 200, {
         ok: true,
-        exists: false,
-        laboratory: labConnected() ? { connected: true, ...lab() } : needsLab('The model of this product'),
+        exists: hasLab,
+        laboratory: hasLab ? { connected: true, ...lab() } : needsLab('The model of this product'),
         stale: false, staleFile: '',
-        model: null,
+        // Форма без чисел: считать их можно только по модели, а модели здесь нет.
+        // Пустой объект вместо null — потому что экран читает у него поля, а не
+        // потому что нам есть что в нём сказать; числа про модель рисует смотрелка.
+        model: hasLab ? { counts: {}, bytes: 0 } : null,
         source: { bytes: src.bytes, files: src.files },
         usage: { summary: summarise(entries, { totalObjects: 0 }), entries: entries.slice(-12).reverse() },
         findings: findingsSummary(F.findings),
-        attention: attention({ projectPath: p, model: {}, exists: false, tasks }),
+        attention: attention({ projectPath: p, model: {}, exists: hasLab, tasks }),
         caught: null,
-        next: nextSkill({ exists: false, stale: false, model: {}, tasks,
+        next: nextSkill({ exists: hasLab, stale: false, model: {}, tasks,
                           findings: F.findings.length, sourceFiles: src.files }),
       });
     }
@@ -1626,12 +1692,16 @@ process.on('uncaughtException', (e) => console.error('uncaught:', ((e as Error)?
 process.on('unhandledRejection', (e) => console.error('unhandled rejection:', ((e as Error)?.stack) || e));
 
 server.on('error', (e) => {
+  // The one line a person reads at the moment nothing started has to be a command
+  // that runs. There is no server.js in this repository — Node runs the .ts file
+  // directly — and a port suggested here must not be the port that just failed.
+  const other = PORT < 1024 ? 4599 : PORT + 1;
   if (e && (e as NodeJS.ErrnoException).code === 'EADDRINUSE') {
     console.error(`\n  Port ${PORT} is already in use.`);
     console.error(`  If the dashboard is already running, just open  http://localhost:${PORT}`);
-    console.error(`  Otherwise start it elsewhere:  GITMIR_PORT=4600 node server.js\n`);
+    console.error(`  Otherwise start it elsewhere:  GITMIR_PORT=${other} node server.ts\n`);
   } else if (e && (e as NodeJS.ErrnoException).code === 'EACCES') {
-    console.error(`\n  Not allowed to listen on port ${PORT}. Pick one above 1024:  GITMIR_PORT=4599 node server.js\n`);
+    console.error(`\n  Not allowed to listen on port ${PORT}. Pick one above 1024:  GITMIR_PORT=${other} node server.ts\n`);
   } else {
     console.error('\n  Could not start: ' + (((e as Error)?.message) || e) + '\n');
   }

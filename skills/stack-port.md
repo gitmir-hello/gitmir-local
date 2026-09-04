@@ -29,25 +29,42 @@ prose around it, never the thing itself.
 
 ## Step 1 — Model the OLD system (your parity checklist)
 
-Build the laboratory of the OLD codebase with the laboratory. In a port
-the old model is not documentation — it is the **checklist of everything that must
-exist in the new app**: every entity/field, serverFunction, apiRoute, frontendUnit,
-event, process and statusFlow. You cannot port what you never enumerated.
+The model of the old system is built in the laboratory, not on this machine. Connect
+it (`GITMIR_LAB_KEY`; `gitmir_setup` says whether you are connected and how), point
+it at the OLD codebase, and ask it to enumerate everything that codebase does. In a
+port that enumeration is not documentation — it is the **checklist of everything that
+must exist in the new app**: every piece of data, every rule that runs on it, every
+endpoint, every screen, every notification and every status change. You cannot port
+what you never enumerated.
+
+With no laboratory connected the enumeration is yours to make by reading the old code,
+and it has to be finished before any new code is written. An incomplete checklist is
+precisely the failure this procedure exists to prevent, so say plainly that it was
+made by hand.
 
 ## Step 2 — Pin the target and the stack map
 
-Distil the goal into `.gitmir/brief.json` with `product-docs-spec`. Then record,
-in its `decisions`, the **stack-mapping** choices — old idiom → new idiom — so they
-stay consistent across the whole port: data layer/ORM, auth, routing, state,
-validation, build. Put in `out` the old features you are deliberately NOT carrying
-over (dead code, retired flows). A port that drops things by accident is a bug; a
-port that drops them on purpose is a decision.
+Write the goal down as `PRODUCT-BRIEF.md` in the root of the new project — the file
+the dashboard reads as the stated goal — or, for a port large enough to need a full
+specification, produce `docs/` with `product-docs-spec` and keep the brief as its
+summary. Give the brief two sections and keep them there for the whole port:
+
+- **Decisions** — the **stack-mapping** choices, old idiom → new idiom, so they stay
+  consistent across the whole port: data layer/ORM, auth, routing, state, validation,
+  build.
+- **Out of scope** — the old features you are deliberately NOT carrying over (dead
+  code, retired flows).
+
+A port that drops things by accident is a bug; a port that drops them on purpose is a
+decision.
 
 ## Step 3 — Build the parity ledger (the core deliverable)
 
-From the old model, write `tasks/port/parity.md`: one row per thing the old app does
-— each entity, serverFunction, apiRoute, frontendUnit, event, process/statusFlow —
-with a status of `not-started` / `ported` / `verified` and its acceptance criteria,
+From that enumeration, write `tasks/port/parity.md`: one row per thing the old app
+does — each piece of data, each rule, each endpoint, each screen, each notification,
+each status change — named by its handle (`gm_` and ten characters) where the
+laboratory issued one, with a status of `not-started` / `ported` / `verified` and its
+acceptance criteria,
 which is **the old behaviour**. Nothing counts as done until its row is `verified`.
 This ledger is what stops the number-one failure of rewrites: half the functionality
 silently missing. A feature not in the ledger is a feature you will lose.
@@ -77,10 +94,10 @@ Run the queue with `task-runner`. For each slice:
 - Replay the captured golden behaviour: the new implementation must produce the same
   output as the old for the same input. A green build is not parity — matching
   behaviour is.
-- Any intended difference from the old app must be a recorded `decision`, not a
-  silent one. An unrecorded difference is a regression.
-- Grow the NEW project's the laboratory as you port (per the GitMir model rule),
-  and flip the slice's ledger rows to `verified`.
+- Any intended difference from the old app must be written into the brief's
+  **Decisions**, not left silent. An unrecorded difference is a regression.
+- Ask the laboratory to re-read the NEW repository as each slice lands, so its model
+  of the new app grows with the port, and flip the slice's ledger rows to `verified`.
 
 ## Step 7 — Migrate the data (if there is a store)
 
@@ -96,5 +113,5 @@ Ported code running against un-migrated data is not a finished port.
 - Verified means the new behaviour matches the old, not that the build is green.
 - Every deviation from the old app is either a recorded decision or a bug.
 - One runnable vertical slice at a time — never a stack-wide big-bang rewrite.
-- Two models live at once: the OLD one is your parity source, the NEW one grows as
-  you port. Keep both true.
+- Two models live at once in the laboratory: the OLD one is your parity source, the
+  NEW one grows as you port. Keep both true.

@@ -25,16 +25,20 @@ reaches them.
 
 ## Before you start
 
-You need two things. If either is missing, say so and stop rather than guessing.
+You need two things. Without the first, say so and stop rather than guessing; the
+second changes what the pass is worth rather than whether it can run.
 
 **The rules, written down somewhere.** A spec, `docs/`, an acceptance document, a client
 brief, a decision log. Not "what the product obviously should do" — a claim you cannot
 point at is not a finding, it is an opinion, and it will be argued away at exactly the
 moment it matters.
 
-**The model.** the laboratory — built by the laboratory. Without it a finding
-has nothing to attach to, and a finding that names no object shows up nowhere. Build the
-model first.
+**The model.** It is built and kept in the laboratory, never on this machine — connect
+this one to it before you start (`GITMIR_LAB_KEY`; `gitmir_setup` says whether you are
+connected and how). Without it a finding has nothing to attach to: it can still be
+recorded, but with no `touches` it lands in a list nobody opens instead of marking the
+thing it concerns on every diagram. If there is no laboratory, work anyway, leave
+`touches` off, and say in the report that the findings are unattached.
 
 ## How to work
 
@@ -63,7 +67,9 @@ gitmir_flag(
   actual:      what the code does instead, naming the function you read
   consequence: what goes wrong for a person — this is what makes it arguable
   source:      where the rule is written: "spec 5.2", "docs/pricing.md", a ticket id
-  touches:     the model ids involved — this is what puts it on the diagrams
+  touches:     the handles the laboratory issued for the things involved — `gm_` and
+               ten characters, copied from its answer, never invented — this is what
+               puts the finding on the diagrams
   readFrom:    the files you read it from — this is what makes it ask to be re-checked
   kind, severity
 )

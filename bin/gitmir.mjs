@@ -175,21 +175,67 @@ async function start() {
   openBrowser(`http://localhost:${PORT}`);
 }
 
+/* Who holds the port, asked of the operating system.
+ *
+ * The same reason the pid file is not the liveness test is the reason it is not
+ * the identity test either: it outlives whatever wrote it, and the system reuses
+ * pid numbers, so a file left by a crash names a stranger's process about as
+ * readily as ours. */
+function portOwners(port = PORT) {
+  try {
+    const out = process.platform === 'win32'
+      ? execFileSync('cmd', ['/c', `netstat -ano | findstr LISTENING | findstr :${port}`], { encoding: 'utf8' })
+      : execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' });
+    // netstat prints whole rows and lsof -t prints bare pids; in both, the only
+    // standalone integers are pids — an address always carries its colon.
+    return String(out).trim().split(/\s+/)
+      .filter((t) => /^\d+$/.test(t)).map(Number).filter((n) => n > 0);
+  } catch { return []; }
+}
+
+/* Does this pid still look like our server?
+ *
+ * Only used where the port could not be traced (a machine with no lsof). It is
+ * the difference between killing a pid because a file said so and killing it
+ * because the process is the one the file claims. */
+function looksLikeServer(pid) {
+  if (!pid) return false;
+  try {
+    if (process.platform === 'win32') {
+      const out = execFileSync('tasklist', ['/fi', `PID eq ${pid}`, '/nh'], { encoding: 'utf8' });
+      return /node\.exe/i.test(out);
+    }
+    return /server\.ts/.test(execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }));
+  } catch { return false; }
+}
+
 async function stop({ quiet = false } = {}) {
   if (!(await listening())) { if (!quiet) say('Not running.'); return; }
-  let pid = 0;
-  try { pid = Number(fs.readFileSync(PIDF, 'utf8').trim()); } catch {}
+  let noted = 0;
+  try { noted = Number(fs.readFileSync(PIDF, 'utf8').trim()) || 0; } catch {}
+  const owners = portOwners();
+  // The port decides who dies; the pid file only breaks a tie when several
+  // processes hold it (macOS lists one per address family).
+  let pid = owners.includes(noted) ? noted : owners[0] || 0;
+  if (!pid && looksLikeServer(noted)) pid = noted;
   if (!pid) {
-    // Started by hand, or the pid file is gone. Find whoever holds the port.
-    try {
-      const out = process.platform === 'win32'
-        ? execFileSync('cmd', ['/c', `netstat -ano | findstr :${PORT}`], { encoding: 'utf8' })
-        : execFileSync('lsof', ['-nP', `-iTCP:${PORT}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' });
-      pid = Number(String(out).trim().split(/\s+/).filter(Boolean).pop());
-    } catch {}
+    // The pid file is either stale or about somebody else. Either way it is not
+    // evidence, so drop it rather than leave it to mislead the next run.
+    try { fs.unlinkSync(PIDF); } catch {}
+    die(`Something is serving port ${PORT} and I cannot tell what.\n    Stop it yourself, or set GITMIR_PORT.`);
   }
-  if (!pid) die(`Something is serving port ${PORT} and I cannot tell what. Stop it yourself, or set GITMIR_PORT.`);
-  try { process.kill(pid); } catch {}
+  try { process.kill(pid); }
+  catch (e) {
+    if (e.code === 'EPERM') die(`Port ${PORT} is held by process ${pid}, which belongs to another user.\n    Stop it yourself, or set GITMIR_PORT.`);
+    // ESRCH: it went away between the lookup and the signal. The port check below
+    // is the answer either way.
+  }
+  // SIGTERM is a request, not an event. Saying "Stopped." before the port frees
+  // is exactly the lie this command used to tell.
+  for (let i = 0; i < 40 && (await listening()); i++) await wait(100);
+  if (await listening()) {
+    die(`Asked process ${pid} to stop, but port ${PORT} is still being served.\n    Look at it with:  ${process.platform === 'win32' ? `netstat -ano | findstr :${PORT}` : `lsof -nP -iTCP:${PORT} -sTCP:LISTEN`}`);
+  }
   try { fs.unlinkSync(PIDF); } catch {}
   say('Stopped.');
 }
@@ -199,14 +245,25 @@ async function update() {
     // Installed by npm, or from a tarball: there is no history to pull. Point at
     // whichever route actually put it here rather than at the one we prefer.
     const viaNpm = DIR.includes(`${path.sep}node_modules${path.sep}`);
+    // Not "npm i -g" again: that is the route refuseNodeModules() exists to turn
+    // people away from, because Node will not strip types under node_modules.
+    // Sending them back into it would be advising the one state that cannot work.
     die(viaNpm
-      ? `Installed through npm, so there is no git history here to pull.\n    Update with:  npm i -g github:gitmir-hello/gitmir-local`
+      ? `Installed through npm, so there is no git history here to pull — and Node cannot run\n    TypeScript from under node_modules anyway.\n\n    Install it the way it expects instead:\n      curl -fsSL https://ide.gitmir.com/install.sh | sh\n\n    Then: npm rm -g gitmir-local`
       : `${DIR} is not a git checkout — there is no history here to pull.\n    Update by running the installer again:\n      curl -fsSL https://ide.gitmir.com/install.sh | sh`);
   }
   say(`Updating ${DIR}`);
   const before = git(['rev-parse', '--short', 'HEAD']).trim();
-  try { console.log(git(['pull', '--ff-only']).split('\n').map((l) => '  ' + l).join('\n')); }
-  catch (e) { die(`git pull failed:\n    ${String(e.message || e).split('\n')[0]}`); }
+  // stderr piped for this one call: git says why it refused — no upstream,
+  // diverged histories, local edits — and it says it on stderr. Without it every
+  // failure reads as the same "Command failed: git … pull --ff-only".
+  try { console.log(git(['pull', '--ff-only'], { stdio: ['ignore', 'pipe', 'pipe'] }).split('\n').map((l) => '  ' + l).join('\n')); }
+  catch (e) {
+    // Six lines: enough that git's own suggested command survives the cut, which
+    // is the line the person is going to run next.
+    const why = String(e.stderr || e.message || e).trim().split('\n').filter((l) => l.trim()).slice(0, 6);
+    die(`git pull failed:\n${why.map((l) => '    ' + l).join('\n')}`);
+  }
   const after = git(['rev-parse', '--short', 'HEAD']).trim();
   if (before === after) { say('Already current.'); return; }
   if (await listening()) {
@@ -293,7 +350,12 @@ function mcpCodex(sub) {
     } catch (e) { die(`Could not write ${file}:\n    ${String(e.message || e)}`); }
     console.log('');
     say(`Wrote ${c('0;36', '.codex/config.toml')} in ${project}.`);
-    say('Commit it and your teammates get it too — Codex reads it in a trusted project.');
+    say('Codex reads it in a trusted project.');
+    // Both paths in that file — the checkout and --project — are absolute and
+    // belong to this machine. Committing it hands a teammate a server that cannot
+    // start, so promise them the command, not the file.
+    say('The paths in it are this machine\'s, so a teammate runs the same command in their');
+    say(`own checkout: ${c('0;36', 'gitmir mcp add-here --codex')}`);
   } else {
     const args = ['mcp', 'add', 'gitmir', '--', 'node', path.join(DIR, 'mcp.ts'), '--project', project];
     try {
@@ -348,8 +410,10 @@ function mcp(sub, flag) {
     //
     //   add       -> user scope: every project, answering about whichever one the
     //               editor was opened in, because the server falls back to its cwd.
-    //   add-here  -> project scope: writes .mcp.json into this folder, which is
-    //               committed and therefore arrives for teammates too.
+    //   add-here  -> project scope: writes .mcp.json into this folder, so the
+    //               registration belongs to the repository rather than to
+    //               wherever the command was typed. The path inside it is still
+    //               this machine's, so it is not a registration for teammates.
     const scope = sub === 'add-here' ? 'project' : 'user';
     const args = ['mcp', 'add', '-s', scope, 'gitmir', '--', 'node', path.join(DIR, 'mcp.ts')];
     try {
@@ -382,9 +446,14 @@ function mcp(sub, flag) {
     console.log('');
     if (scope === 'user') {
       say('Added for every project. The server answers about whichever folder your editor is open in.');
-      say(`To pin it to one repository instead — and commit it for teammates: ${c('0;36', 'gitmir mcp add-here')}`);
+      say(`To pin it to one repository instead: ${c('0;36', 'gitmir mcp add-here')}`);
     } else {
-      say(`Added to .mcp.json in ${process.cwd()} — commit it and your teammates get it too.`);
+      say(`Added to .mcp.json in ${process.cwd()}.`);
+      // The file names this checkout by absolute path. A teammate who commits it
+      // and opens the project gets a server that cannot start — better said here
+      // than discovered as a silent MCP failure with no screen to show it.
+      say(`It points at ${path.join(DIR, 'mcp.ts')}, a path that exists on this machine,`);
+      say(`so a teammate runs ${c('0;36', 'gitmir mcp add-here')} in their own checkout.`);
     }
     console.log('');
     say(`${c('1;37', 'Restart your editor')} — a client reads its MCP config once, at startup.`);
@@ -399,25 +468,29 @@ function mcp(sub, flag) {
 }
 
 /**
- * Ask the MCP server a question and print what it said.
+ * Prepare a project through the MCP server, and print what the server said.
  *
- * The long form of this is `cd <checkout> && node mcp-check.ts <project> model`,
- * which is three things to get right in a line somebody is copying while already
- * unsure whether anything works. This is the same call with the paths filled in.
+ * The long form is `cd <checkout> && node mcp-check.ts <project> setup`, which is
+ * three things to get right in a line somebody is copying while already unsure
+ * whether anything works. This is the same call with the paths filled in.
+ *
+ * It asks for `setup` rather than for the model: the model is not on this machine
+ * and never will be — it lives in the laboratory — so asking for it printed
+ * "Unknown tool" at the very person checking a working install. `setup` answers
+ * with what the install can actually do, and names what it is still missing.
+ *
+ * Setup writes: it creates the task folders in the project and adds the project
+ * to the dashboard's list. That is the point of it, and the help says so — a
+ * command that quietly writes while calling itself a question is worse than one
+ * that writes and admits it.
  */
 function check(arg) {
   const project = path.resolve(arg || process.cwd());
   if (!fs.existsSync(project)) die(`No such folder: ${project}`);
-  say(`Asking the server about ${project}`);
+  say(`Setting ${project} up, and asking what is still missing.`);
+  say('This writes: the task folders in that project, and an entry in the dashboard.');
   console.log('');
   try {
-    /* Спрашиваем `setup`, а не модель.
-     *
-     * Модели здесь нет и не будет — она живёт в лаборатории, — а команда
-     * продолжала спрашивать именно её и печатала «Unknown tool». Первое, что
-     * делает человек, проверяя установку, — эта команда; она обязана отвечать
-     * тем, что установка правда умеет, а `setup` к тому же и говорит, чего ей
-     * не хватает. */
     execFileSync(process.execPath, ['mcp-check.ts', project, 'setup'], { cwd: DIR, stdio: 'inherit' });
   } catch {
     die('The check did not run. `gitmir status` will say whether Node is new enough.');
@@ -439,7 +512,18 @@ async function doctor() {
   row('install', DIR);
   row('state', STATE);
   row('node', 'v' + process.versions.node + (nodeOk() ? '' : c('1;31', '  TOO OLD — needs 22.18+')));
-  row('claude CLI', has('claude') ? 'on PATH' : c('1;33', 'missing — the Run Claude button needs it'));
+  // Two agents, not one. This file already knows how to find Codex — where it is
+  // installed it is usually inside ChatGPT.app and not on the PATH — so a machine
+  // with Codex and no Claude was being told it was missing what it needs.
+  row('claude CLI', has('claude') ? 'on PATH' : c('1;33', 'not found — needed only to run Claude Code from here'));
+  const codex = codexBin();
+  row('codex CLI', codex ? (codex === 'codex' ? 'on PATH' : codex) : c('1;33', 'not found — needed only to run Codex from here'));
+  // The laboratory is half of what this tool does, and the first thing setup asks
+  // for. Reading the environment is the whole test, deliberately: probing the
+  // network here would make `gitmir status` sit on a timeout when offline.
+  row('laboratory', (process.env.GITMIR_LAB_KEY || '').trim()
+    ? 'GITMIR_LAB_KEY is set'
+    : c('1;33', 'no GITMIR_LAB_KEY — the model lives at lab.gitmir.com/account/access'));
   row(`port ${PORT}`, (await listening()) ? 'serving' : 'not running');
   row('version', ver);
   row('runtime deps', deps);
@@ -457,12 +541,12 @@ const HELP = `
     gitmir              start it and open the browser
     gitmir stop         stop the server
     gitmir restart      stop, then start
-    gitmir status       node, port, version, what is missing
+    gitmir status       node, agents, laboratory, port, version
     gitmir update       git pull, and restart if it was running
     gitmir mcp          the MCP config for your editor
     gitmir mcp add      register it for every project (Claude Code CLI)
-    gitmir mcp add-here pin it to this folder, in a committed .mcp.json
-    gitmir check [dir]  ask the server what it knows, and print the answer
+    gitmir mcp add-here pin it to this folder, in .mcp.json
+    gitmir check [dir]  set a project up, and print what is still missing (writes)
     gitmir log [n]      the last n lines the server printed
     gitmir path         where the checkout lives
 

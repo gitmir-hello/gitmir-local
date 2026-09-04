@@ -42,9 +42,11 @@ prose around it, never the thing itself.
 **Use it when:** a new product or niche is starting; there is input but no specification;
 you are asked to "put the docs together".
 
-**Result:** a `<Project>/docs/` folder with exactly **12 files** (see §3). The language of
-the docs is the language of the product (the local language for a local niche, English for
-an international catalogue, and so on) — but one language throughout the folder.
+**Result:** a `<Project>/docs/` folder with exactly **12 files** (see §3), in English
+throughout — see Language above. One language for the whole folder, and that language is
+English whatever language the product itself is sold in: these files outlive the
+conversation that produced them and are read by people who took no part in it. Product
+copy, enum values and anything else quoted from the domain stay in their own words.
 
 **Important:** docs first, code second. If you are asked to "build the whole project", this
 skill is the FIRST step (the docs); development against those docs starts only afterwards.
@@ -243,7 +245,7 @@ lives in a known infrastructure, refer to its deployment rules.
       and backups.
 - [ ] 09_OPEN_QUESTIONS: every question has a default and a blocking/not-blocking flag.
 - [ ] Numbers, enums and entity names are consistent across every file and with the data.
-- [ ] One language throughout the docs; the cross-links are in place.
+- [ ] The docs are in English throughout; the cross-links are in place.
 
 When the checklist is green, the `docs/` folder is ready to serve as the specification, and
 the product can be built from it.

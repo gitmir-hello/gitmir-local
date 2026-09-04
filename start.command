@@ -1,15 +1,18 @@
 #!/bin/bash
-# Двойной клик по этому файлу в Finder запускает GitMir Local.
+# Double-click this file in Finder to launch GitMir Local.
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
-URL="http://localhost:4599"
+# Same override the server honours, so a dashboard started on another port is
+# still found here instead of being started a second time.
+PORT="${GITMIR_PORT:-4599}"
+URL="http://localhost:$PORT"
 
-# Если сервер уже поднят — просто открываем браузер и выходим.
+# Already up? Just open the browser and leave it alone.
 if curl -s "$URL/api/ping" >/dev/null 2>&1; then
   open "$URL"
   exit 0
 fi
 
-# Иначе запускаем сервер (он сам откроет браузер).
+# Otherwise start the server — it opens the browser itself.
 exec node server.ts

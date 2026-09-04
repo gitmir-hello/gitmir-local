@@ -121,8 +121,8 @@ Build the list of what exists from **three independent sources**, because each m
 something different, and the disagreements between them are findings in their own right.
 
 1. **The laboratory**, if one is connected — ask it which screens exist, which endpoints,
-   and which flows are worth proving. Use
-   the laboratory to read it rather than opening every file.
+   and which flows are worth proving. Asking is what makes this source cheap: it already
+   holds the answer, so you get the list without opening every file in the repository.
 2. **The router**, from the code — route definitions, page files, framework conventions
    (`pages/`, `app/`, `routes.rb`, a router config). This is what the app claims to have.
 3. **A crawl** of the running app — start at the root, follow same-origin links, breadth
@@ -131,8 +131,9 @@ something different, and the disagreements between them are findings in their ow
 Then cross-check, and write down what does not line up:
 
 - In the router but never reachable by crawling → dead route, or UI with no link to it.
-- Reachable but not in the model → the model is out of date; note it and refresh it after.
-- An `apiRoute` no frontend unit consumes → dead endpoint, or a client you have not found.
+- Reachable but not in the model → the model is out of date; note it, and ask the
+  laboratory to re-read the repository after the run.
+- An endpoint no screen calls → dead endpoint, or a client you have not found.
 
 **On "every element".** A page has hundreds of nodes and most are decoration. The inventory
 records **interactive elements** — links, buttons, inputs, selects, forms, and anything with
@@ -187,13 +188,14 @@ Type: verify
 ## Context
 App audit, page 12 of 34. Inventory: `.gitmir/audit/inventory.json`.
 URL: http://localhost:3000/checkout   ·   auth: test user `qa@example.com`
-Model: proc-checkout, sfw-order-state, rt-orders-post.
+Model: gm_4c1f0a7b92 (the checkout process), gm_7d0e3a115c (the order status flow),
+gm_9b2f4e6d08 (POST /api/orders).
 Destructive controls on this page, NOT to be pressed: "Place order" (charges the card).
 
 ## Verify
 1. Load the page logged out — redirects to /login, does not render an empty cart shell.
-2. Log in, load it with one item — the total equals the item price plus shipping from
-   `proc-checkout`; no console errors.
+2. Log in, load it with one item — the total equals the item price plus shipping as the
+   checkout process (`gm_4c1f0a7b92`) defines it; no console errors.
 3. Submit with an empty address — the form is refused and the message names the field.
    (expected: from `04_SCREENS.md`)
 4. Change the quantity to 0 — the line is removed and the total recalculates.
@@ -323,5 +325,6 @@ passed invites everyone to believe the app is fine.
   Mixing the two loses the record of what was broken.
 - **Cap the run and say where you capped it.** Crawl depth, page count, use cases per page —
   state the limits in the report. A silent cap reads as full coverage.
-- **If the model exists, refresh it after.** An audit walks the whole product and will find
-  screens and routes the model is missing; leaving them out wastes what you just learned.
+- **If a laboratory is connected, ask it to re-read the repository after.** An audit walks
+  the whole product and will find screens and routes the model is missing; leaving them out
+  wastes what you just learned.

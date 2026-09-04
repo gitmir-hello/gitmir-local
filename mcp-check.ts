@@ -10,14 +10,22 @@
 //   node mcp-check.ts                                  (this help)
 //
 // It starts mcp.ts as a subprocess and stops it again. Nothing listens on a port,
-// nothing is uploaded. The only commands that write anything are `new`, `approve`
-// and `withdraw` — and they write into the project you name, exactly as the editor
-// would.
+// nothing is uploaded. The commands that write are `new`, `approve`, `withdraw`,
+// `flag`, `accept` and `setup`: the first five write into the project you name,
+// exactly as the editor would, and `setup` also creates the task folders and adds
+// the project to this installation's dashboard list. The rest only read.
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 
+// Nothing here asks about the model itself, and nothing can: the model lives in the
+// laboratory and is asked for over the same protocol, at its own address. The
+// commands that used to ask for it stayed here after it moved and answered "Unknown
+// tool" — so the first thing a person did to check a working installation was
+// produce an error. That belongs next to the help and not inside it: the list below
+// is what somebody reads to find a command, and an explanation dropped halfway down
+// it splits the list in two.
 const HELP = `
 Check the GitMir MCP server
 
@@ -33,15 +41,10 @@ examples/refund-shop, which ships with this repository.
   setup             prepare a project: dashboard entry, task queue, what is missing
   skills            the written procedures and when to use one
   skill <name>      one procedure in full
-
-  Ничего про саму модель здесь нет и быть не может: она живёт в лаборатории,
-  и спрашивают её тем же протоколом, но по её адресу. Раньше эти команды тут
-  оставались и печатали «Unknown tool» — то есть первое, что делал человек,
-  проверяя исправную установку, была ошибка.
   queue             the planned work
   flag              record a finding (writes into the project)
   findings          where the code disagrees with the product
-  attention         what needs a person, worked out from the model
+  attention         what needs a person right now
   accept <id>       record a decision to live with one
   new <title>       write a task (with proper verify steps)
   newbad <title>    try to write a task with NO verify steps — the server must refuse
@@ -140,7 +143,7 @@ const GOOD = (title: string) => ({
   title,
   task: 'Written by mcp-check to prove the write path works. Delete this task afterwards.',
   verify: ['The task file appeared in tasks/todo', 'The dashboard shows it in the queue'],
-  touches: ['sf-refund-order'],
+  touches: ['gm_261dcdf61e'],
   context: 'Refunds live in the Orders area.',
 });
 const BAD = (title: string) => ({ title, task: 'No verify steps, on purpose — the server must refuse this.' });
@@ -196,12 +199,11 @@ switch (cmd) {
   case 'setup':  head('Setting the project up');    show(await call('gitmir_setup', {})); break;
   case 'skills': head('The procedures on offer');   show(await call('gitmir_skills', {})); break;
   case 'skill':  head('Procedure: ' + arg);         show(await call('gitmir_skill', { name: arg })); break;
-  /* Три вопроса про саму модель отсюда убраны: инструментов под ними больше нет.
-   *
-   * Модель живёт в лаборатории, и спрашивают её там — тем же протоколом, но по
-   * другому адресу. Здесь они оставались командами, которые честно печатали
-   * «Unknown tool», и первое, что делал человек, проверяя установку, — получал
-   * ошибку от исправной установки. */
+  /* The three questions about the model itself are gone from here: there are no
+   * tools behind them any more. The model lives in the laboratory and is asked for
+   * there — same protocol, different address. Left here, they were commands that
+   * dutifully printed "Unknown tool", so the first thing a person did to check a
+   * working installation was collect an error from it. */
   case 'queue':    head('The queue');                       show(await call('gitmir_queue', {})); break;
   case 'flag':     head('Recording a finding');
     show(await call('gitmir_flag', {
@@ -209,7 +211,7 @@ switch (cmd) {
       actual: 'refundOrder subtracts the requested amount without checking it against the order total.',
       consequence: 'A partial refund larger than the payment leaves the shop owing money.',
       source: 'mcp-check, to prove the write path works — delete it afterwards',
-      touches: ['sf-refund-order'], kind: 'contradicts-spec', severity: 'high', readFrom: ['src/refund.ts'],
+      touches: ['gm_261dcdf61e'], kind: 'contradicts-spec', severity: 'high', readFrom: ['src/refund.ts'],
     })); break;
   case 'findings': head('Where the code disagrees with the product'); show(await call('gitmir_findings', { status: arg || 'open' })); break;
   case 'attention': head('What needs a person');                    show(await call('gitmir_attention', {})); break;
@@ -253,7 +255,14 @@ switch (cmd) {
     break;
   }
   default:
+    // A command nobody implements is a mistake, and printing the help for it looks
+    // exactly like printing the help for no arguments at all — the reader cannot
+    // tell a typo from a broken installation. Say which word was not understood,
+    // and leave a non-zero status for whatever ran this.
+    console.error(`\n  Unknown command: ${cmd}\n`);
     console.log(HELP);
+    srv.stdin.end();
+    process.exit(1);
 }
 
 // The server's log belongs on stderr; stdout is for messages and nothing else.

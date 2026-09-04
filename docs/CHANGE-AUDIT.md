@@ -22,7 +22,7 @@ One line per move, appended to `.gitmir/audit/events.jsonl` in your project:
 
 ```json
 {"t":"2026-08-19T09:30:00.000Z","change":"refunds","task":"001-refund-button",
- "from":"todo","to":"doing","kind":"build","areas":["mod-refunds"]}
+ "from":"todo","to":"inprogress","kind":"build"}
 ```
 
 - `change` — the `Change:` line on the task. Every task from the same request
@@ -31,9 +31,13 @@ One line per move, appended to `.gitmir/audit/events.jsonl` in your project:
 - `task` — the file name, without `.md`.
 - `from` / `to` — the columns. `from: null` is a task appearing; `to: null` is one
   disappearing.
-- `areas` — the areas of the model the task's `Touches:` ids belong to, resolved
-  when the move is recorded, so the record stays readable after the task is
-  deleted and the model rebuilt.
+- `ids` — the handles on the task's `Touches:` line, copied as the task wrote
+  them: opaque labels that point at something and say nothing else. Written only
+  when the task named any, which is what makes the per-object cut possible.
+- `areas` — which area each of those handles belongs to, stamped in at the moment
+  of the move so the record stays readable after the task is deleted. Only the
+  laboratory knows that mapping, so the field is absent — and the per-area cut
+  empty — until one is connected.
 
 **There is no author field.** No name, no email, no machine, no hostname. The file
 is append-only and never leaves your machine unless you press the button that
@@ -116,7 +120,7 @@ reported as a share: the time after the first review over the whole measured tim
 
 It rolls up three ways, from the same rows:
 
-- **Per object.** A task's `Touches:` line names model ids. Every change that named
+- **Per object.** A task's `Touches:` line names handles. Every change that named
   an object carries its rework to that object, so `issueRefund` can read 62% while
   the area around it reads 54%.
 - **Objects named together are one row.** A change's rework belongs to the change,
@@ -178,7 +182,7 @@ instead of showing a confident `0%`.
 
 The button beside the results opens a form — email required, name, company, note —
 and then shows the **exact JSON** that will leave, updating as you type. The
-numbers on the screen, the fields you filled, the areas by name-in-the-model, the
+numbers on the screen, the fields you filled, the labels they are grouped under, the
 build version. No paths, no file names, no code, no model.
 
 If a rate is set, one tick box offers to include it — `hourlyRate`, `currency` and

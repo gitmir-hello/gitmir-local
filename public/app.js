@@ -1,116 +1,10 @@
-// ---------- share a read-only map ----------
-// Path 1 of SHARE_THE_MAP.md: one snapshot the author deliberately sends. It needs the
-// workspace key and nothing else — no plan, no bridge connection, no socket. Never call
-// this on a timer; one press, one snapshot.
-const SHARE_SEES = 'the areas, what a user can do, how things move between states, the screens and the kinds of record';
-const SHARE_HIDES = 'field names, endpoints, the steps inside a flow, or a single line of code';
-
-function openSharePopup(){
-  if(!selected){ toast('Pick a project first', true); return; }
-  if(!modelData || !modelData.exists){ toast('Connect a laboratory first — that is where the model lives', true); return; }
-  if(modelSrc){ toast('You can only share your own model, not a teammate snapshot', true); return; }
-  const mem=loadTeamMem();
-  const title=(modelData.index && modelData.index.project) || (selected.split('/').pop()) || 'Product map';
-  let ov=document.getElementById('shareOverlay');
-  if(!ov){ ov=document.createElement('div'); ov.id='shareOverlay'; ov.className='ctx-overlay'; overlayHost().appendChild(ov); }
-  ov.innerHTML=
-    '<div class="ctx-modal share-modal">'+
-      '<div class="ctx-head"><div class="ctx-title">Share this map</div><button class="ctx-x" title="Close (Esc)">✕</button></div>'+
-
-      '<div class="sh-body">'+
-      '<div class="sh-key'+(mem.key?' has':'')+'">'+
-        '<label>Workspace key</label>'+
-        '<input class="ti" id="shKey" type="password" autocomplete="off" spellcheck="false" placeholder="paste the key from ide.gitmir.com" value="'+esc(mem.key||'')+'">'+
-        '<div class="sh-note">Free on any plan. This does not connect the bridge and does not need one.</div>'+
-      '</div>'+
-
-      '<div class="sh-modes">'+
-        '<label class="sh-radio"><input type="radio" name="shAccess" value="link" checked><span>Anyone with the link</span></label>'+
-        '<label class="sh-radio"><input type="radio" name="shAccess" value="people"><span>Only these people</span>'+
-          '<input class="ti sh-people" id="shPeople" placeholder="client@company.com, pm@company.com" disabled></label>'+
-      '</div>'+
-
-      '<div class="sh-exp"><label>Expires in</label>'+
-        '<select class="ti" id="shExp">'+
-          '<option value="7">7 days</option>'+
-          '<option value="30" selected>30 days</option>'+
-          '<option value="90">90 days</option>'+
-          '<option value="">never</option>'+
-        '</select></div>'+
-
-      '<div class="sh-what">'+
-        '<div><b>They see</b> '+SHARE_SEES+'.</div>'+
-        '<div><b>They do not see</b> '+SHARE_HIDES+'.</div>'+
-      '</div>'+
-
-      '<div class="sh-out" id="shOut"></div>'+
-      '</div>'+
-
-      '<div class="ctx-actions">'+
-        '<button class="run sh-go">Create link</button>'+
-        '<button class="ghost sh-file">⬇ Or save a self-contained file</button>'+
-        '<button class="del sh-close">Close</button>'+
-      '</div>'+
-    '</div>';
-  mountOverlay(ov).classList.add('show');
-  const close=()=>{ ov.classList.remove('show'); ov.innerHTML=''; };
-  ov.querySelector('.ctx-x').addEventListener('click', close);
-  ov.querySelector('.sh-close').addEventListener('click', close);
-  ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
-
-  const people=ov.querySelector('#shPeople');
-  ov.querySelectorAll('input[name=shAccess]').forEach(r=> r.addEventListener('change', ()=>{
-    people.disabled = ov.querySelector('input[name=shAccess]:checked').value!=='people';
-    if(!people.disabled) people.focus();
-  }));
-
-  // Path 3 — nothing is uploaded, for an NDA where nothing may be.
-  ov.querySelector('.sh-file').addEventListener('click', ()=>{
-    const a=document.createElement('a');
-    a.href='/api/share/export?path='+encodeURIComponent(selected)+'&name='+encodeURIComponent(title);
-    a.download=''; document.body.appendChild(a); a.click(); a.remove();
-    toast('Building the file — check your downloads');
-  });
-
-  ov.querySelector('.sh-go').addEventListener('click', async (e)=>{
-    const btn=e.currentTarget, out=document.getElementById('shOut');
-    const key=(document.getElementById('shKey').value||'').trim();
-    const access=ov.querySelector('input[name=shAccess]:checked').value;
-    const allowed=access==='people'
-      ? (people.value||'').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean)
-      : [];
-    if(access==='people' && !allowed.length){ out.className='sh-out err'; out.textContent='Add at least one address, or choose "Anyone with the link".'; return; }
-    const expRaw=document.getElementById('shExp').value;
-    btn.disabled=true; out.className='sh-out'; out.textContent='Creating…';
-    let r; try{
-      r=await (await fetch('/api/team/share-view',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ key, path:selected, title, access, allowed, expiresInDays: expRaw===''?null:Number(expRaw) })})).json();
-    }catch{ r={ok:false,error:'could not reach the local server'}; }
-    btn.disabled=false;
-    if(r && r.ok && r.url){
-      // The key worked, so keep it for next time — same place the Team tab keeps it.
-      if(key){ const m=loadTeamMem(); m.key=key; saveTeamMem(m); }
-      out.className='sh-out ok';
-      out.innerHTML=
-        '<div class="sh-url"><code>'+esc(r.url)+'</code><button class="ghost sh-copy">📋 Copy</button></div>'+
-        (access==='people'
-          ? '<div class="sh-warn">Only the addresses you listed can open it, and they must sign in.</div>'
-          : '<div class="sh-warn">Anybody holding this link can open it, so pass it on the way you would a password.</div>')+
-        '<div class="sh-manage"><a href="https://ide.gitmir.com/settings#shared" target="_blank" rel="noopener">Manage or revoke your links ↗</a> — Settings → Shared links on ide.gitmir.com</div>';
-      out.querySelector('.sh-copy').addEventListener('click', async ()=>{ await copyToClipboard(r.url); toast('Link copied ✓'); });
-      copyToClipboard(r.url).then(()=>toast('Link copied ✓')).catch(()=>{});
-    } else {
-      out.className='sh-out err';
-      out.innerHTML=esc((r && r.error) || 'Share failed')+
-        ((r && /25 live links/.test(r.error||'')) ? ' <a href="https://ide.gitmir.com/settings#shared" target="_blank" rel="noopener">Open Settings ↗</a>' : '');
-    }
-  });
-}
+// Sharing a map from here is gone, not hidden: both halves of it (a snapshot file and a
+// link) asked for server routes that do not exist, and a button that answers 404 is worse
+// than no button. The map is read from the laboratory, so a guest is invited there.
 
 // A shared view runs this exact file with the model handed to it instead of fetched, and
 // with everything that writes disabled. Same renderer as the dashboard, by construction —
 // there is no second implementation to drift.
-const SHARE = window.__GITMIR_SHARE__ || null;
 
 const listEl = document.getElementById('list');      // the project tile grid
 const mainEl = document.getElementById('main');
@@ -205,7 +99,7 @@ function renderList(){
     e.innerHTML = projects.length
       ? 'Nothing matches <b>' + esc(searchEl.value.trim()) + '</b>.'
       : 'No projects yet. <b>＋ Add project</b> and point it at any folder on any disk — '
-        + 'then open it, run Claude in it, and the model, the queue and the log fill up as it works.';
+        + 'then open it, connect a laboratory, and the map, the queue and the log fill up as you work.';
     listEl.appendChild(e); return;
   }
   list.forEach((p, i) => {
@@ -403,7 +297,6 @@ function renderDetail(){
       '<div class="model-head">' +
         '<div class="model-subnav" id="modelNav"></div>' +
         '<span class="upd" id="modelUpd"></span>' +
-        '<button class="mrefresh mshare" id="modelShare" title="Share this model — read only">⇪ Share</button>' +
         '<button class="mrefresh" id="modelRefresh" title="Refresh model">⟳</button>' +
       '</div>' +
       '<div id="modelView"><div class="model-empty">Opening model…</div></div>' +
@@ -475,7 +368,6 @@ function renderDetail(){
   wrap.querySelector('#delBtn').addEventListener('click', ()=>remove(p));
   wrap.querySelectorAll('.tab-btn').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
   wrap.querySelector('#modelRefresh').addEventListener('click', ()=>{ if(selected) loadModel(selected); });
-  wrap.querySelector('#modelShare').addEventListener('click', openSharePopup);
   if(selected) loadNextStep(selected).then(()=>{ if(selected===p.path) renderSkillButtons(); });
   setTab(activeTab);
   wrap.querySelectorAll('.sub-pill').forEach(b=>b.addEventListener('click',()=>{
@@ -759,32 +651,6 @@ let mermaidReady = null;
 // Six questions, in the order someone asks them. Ten pills in a row is a list of
 // features; these are the things an enterprise reader actually arrives wanting to
 // settle, and the views underneath each one are how it gets settled.
-const MODEL_GROUPS = [
-  { key:'what',  label:'What it does',        hint:'The product in the words of the business, and what moves between its parts.',
-    views:[{key:'map',label:'Product map'},{key:'journeys',label:'Journeys'},{key:'er',label:'Data'},{key:'flow',label:'Data flow'},{key:'events',label:'Events'}] },
-  { key:'why',   label:'Why it works this way', hint:'The rules the product enforces, and the conditions behind each branch.',
-    views:[{key:'logic',label:'Lifecycles'},{key:'decisions',label:'Decisions'}] },
-  { key:'cost',  label:'What a change costs',  hint:'What a planned change reaches, and how much of the product that is.',
-    views:[{key:'impact',label:'Impact'}] },
-  { key:'who',   label:'Who answers for it',   hint:'Owning teams, who may change what, and the parts nobody has claimed.',
-    views:[{key:'ownership',label:'Ownership'}] },
-  { key:'trust', label:'How much to trust it', hint:'Where each answer came from, and which parts of the model to doubt.',
-    views:[{key:'confidence',label:'Confidence'}] },
-  { key:'build', label:'What we are building', hint:'What the product should become, declared here — and how much of it exists yet.',
-    views:[{key:'design',label:'Design'}] },
-  { key:'done',  label:'What actually happened', hint:'The product changing, in the order it changed.',
-    views:[{key:'spec',label:'Spec vs code'},{key:'changed',label:'What changed'},{key:'mismatch',label:'Intended vs done'},{key:'timeline',label:'Timeline'},{key:'overview',label:'Overview'}] },
-];
-/* Словарь, которым описан продукт, приходит вместе с моделью — из лаборатории.
- *
- * Раньше он лежал здесь списком: десять измерений и их внутренние ключи, открытым
- * текстом в файле, который отдаётся любому браузеру. Это и есть устройство модели,
- * то самое, чего этот продукт про себя не рассказывает. Теперь пусто до ответа
- * лаборатории — а она называет части продукта деловыми словами и своих ключей не
- * показывает. */
-let DIM_LABEL = {};
-let DIM_ORDER = [];
-let DIM_ONE = {};
 const MODEL_VIEWS = MODEL_GROUPS.flatMap(g=>g.views);
 const groupOfView = (k)=> (MODEL_GROUPS.find(g=>g.views.some(v=>v.key===k))||MODEL_GROUPS[0]).key;
 // Layers paint the product map with something other than its own structure: how much
@@ -977,8 +843,11 @@ function renderMcpBox(){
   const addHere = isCodex ? codexHere : claudeHere;
   // Same reasoning as the register command: show the short form when the launcher
   // is on this machine, and the long one when it is not.
+  // `setup`, not `model`: there is no model command any more — the model is not built
+  // here — and mcp-check answers an unknown one with its own usage, which reads as a
+  // broken install to somebody who ran exactly what this page told them to run.
   const check = hasCli ? 'gitmir check '+q(proj)
-    : 'cd '+q(home)+' && node mcp-check.ts '+q(proj)+' model';
+    : 'cd '+q(home)+' && node mcp-check.ts '+q(proj)+' setup';
 
   // Four steps, each answering the same three questions in the same order: what
   // you do, what it buys, and how you know it worked. The page before this put
@@ -1031,8 +900,10 @@ function renderMcpBox(){
     '<div class="mcp-steps">'+
     step(1,
       'Register this project with your agent',
-      'One command, once. It writes a line into your Claude config and nothing else — no service, no port, no '+
-      'account. Registered for every project: the server answers about whichever folder your editor is open in.',
+      'One command, once. It writes a line into your Claude config and nothing else — no service and no port. '+
+      'Registered for every project: the server answers about whichever folder your editor is open in. The model '+
+      'itself comes from the laboratory over <code>GITMIR_LAB_KEY</code>, so that part does need an account; '+
+      'the queue, the findings and the audits do not.',
       add,
       (isCodex
         ? ('Codex keeps one global config and offers no scope, so this registration names the project. '+
@@ -1081,15 +952,17 @@ function renderMcpBox(){
     '<div class="mcp-card check">'+
       '<div class="mcp-card-t">Check it without an editor</div>'+
       '<p>An MCP server has no screen, which makes a broken setup hard to tell from a working one. This starts the '+
-      'server exactly as your editor would, asks it one question, and prints the answer for a person.</p>'+
+      'server exactly as your editor would, asks it to set this project up, and prints the answer for a person.</p>'+
       '<button class="ms-cmd" data-copy="'+esc(check)+'" title="Copy"><span class="ms-cmd-c">'+esc(check)+
       '</span><span class="ms-cmd-a">Copy</span></button>'+
     '</div>'+
 
     '<div class="mcp-card warn">'+
       '<div class="mcp-card-t">If the answers are not what you expected</div>'+
-      '<div class="mcp-q"><b>Everything comes back "there is no model here yet".</b> Not a broken connection — the '+
-      'model is missing. Build it from the <b>Skills</b> page, or ask the agent to.</div>'+
+      '<div class="mcp-q"><b>Everything comes back "there is no model here yet".</b> Not a broken connection — this '+
+      'machine is not pointed at a laboratory, which is where the model of a product is built and kept. Open '+
+      '<a href="https://lab.gitmir.com/account/access" target="_blank" rel="noopener">lab.gitmir.com/account/access</a>, '+
+      'copy the key, set it as <code>GITMIR_LAB_KEY</code> in the environment, and start the server again.</div>'+
       '<div class="mcp-q"><b>No gitmir_ tools are listed.</b> The client has not re-read its config. Restart it, then '+
       'check <code>'+(isCodex?'codex':'claude')+' mcp list</code>.</div>'+
       (isCodex
@@ -1274,7 +1147,7 @@ async function openThing(view, handle, backTo){
 
 async function loadModel(pathStr){
   const view=document.getElementById('modelView'); if(!view) return;
-  const req = ++modelReq, wantSrc = modelSrc;   // this call's identity
+  const req = ++modelReq;   // this call's identity
   view.innerHTML='<div class="model-empty">Loading model…</div>';
   /* Модель приходит из лаборатории, а не с этого диска.
    *
@@ -1287,94 +1160,12 @@ async function loadModel(pathStr){
   if(d && d.error){ view.innerHTML='<div class="model-empty"><b>The laboratory could not answer.</b><br>'+esc(d.error)+'</div>'; modelData=null; return; }
   modelData=d; modelFor=pathStr;
   drawMap(view, d);
-  return;
-  // Drop a superseded response: the user may have switched project OR source while
-  // this was in flight, and a late answer must not overwrite the current model.
-  if(req!==modelReq || selected!==pathStr || wantSrc!==modelSrc) return;
-  // A teammate's snapshot can disappear (project rebound, folder cleaned) — fall
-  // back to our own model rather than showing an empty pane for a missing source.
-  if(modelSrc && !(d.shared||[]).some(s=>s.name===modelSrc)){ modelSrc=null; return loadModel(pathStr); }
-  modelData=d; modelFor=pathStr;
-  // A shared model is somebody else's snapshot; their findings are about their
-  // copy of the code and would be claims about a repository we cannot see.
-  await loadFindings(modelSrc ? null : pathStr);
-  renderModelSrc(d);
-  renderModelStale(d);
-  renderIngest(d);   // after stale: a running ingest owns the tab badge
-  const upd=document.getElementById('modelUpd');
-  if(upd) upd.textContent = (d.index && d.index.at) ? ('updated '+fmtTime(d.index.at)) : '';
-  const nav=document.getElementById('modelNav');
-  if(!d.exists){
-    if(nav) nav.innerHTML='';
-    const shared=(d.shared||[]).map(s=>s.name);
-    const ing=d.ingest&&d.ingest.counts;
-    view.innerHTML = modelSrc
-      ? '<div class="model-empty">Teammates no longer pass copies of the product around. Everyone asks the same laboratory, which is the only version that can be kept current — and the only one whose access can be taken back.</div>'
-      // An ingest is under way: the model is empty because the first fragments have not
-      // landed, not because nobody started.
-      : ing && ing.done < ing.total
-      ? '<div class="model-empty"><b>The ingest has not written anything yet.</b><br>'+
-        ing.total+' fragments are planned and '+ing.done+' are done — diagrams appear here as soon as the first fragment lands entities in the laboratory. Progress is above; the fragments themselves are tasks in the <b>Queue</b> tab.</div>'
-      : '<div class="model-empty"><b>This project has no model of its own yet.</b><br>'+
-        (shared.length
-          ? 'Switch to <b>⇪ '+esc(shared[0])+'</b> above to explore the model your teammate shared — it is on this machine, under <code>.gitmir/shared/</code>.'
-          : 'In the <b>Settings</b> tab click <b>📋 the laboratory</b>, paste into '+agentName()+' (⌘V + Enter) — it will build the laboratory, and diagrams of data, processes and flows will appear here.')+'</div>';
-    return;
-  }
-  renderModelNav(); renderModelView();
 }
 
 
 let ingSel = null;   // which fragment cell is expanded
 
 
-function renderModelNav(){
-  const nav=document.getElementById('modelNav'); if(!nav) return;
-  const g=groupOfView(modelView);
-  const grp=MODEL_GROUPS.find(x=>x.key===g)||MODEL_GROUPS[0];
-  nav.innerHTML='';
-  const top=document.createElement('div'); top.className='mgroups';
-  for(const x of MODEL_GROUPS){
-    const b=document.createElement('button');
-    b.className='mgroup'+(x.key===g?' active':''); b.textContent=x.label; b.title=x.hint;
-    b.addEventListener('click', ()=>{ modelView=x.views[0].key; renderModelNav(); renderModelView(); });
-    top.appendChild(b);
-  }
-  nav.appendChild(top);
-  const hint=document.createElement('div'); hint.className='mghint'; hint.textContent=grp.hint;
-  nav.appendChild(hint);
-  // A group with one view used to render no tab bar at all: a single tab is a choice
-  // that is not a choice. But then its name appears nowhere, and somebody sent to look
-  // at "Confidence" reads the group heading, does not find the word, and reports the
-  // view as missing while looking straight at it. So the name is always shown — as a
-  // tab when there is something to choose between, as a plain label when there is not.
-  if(grp.views.length===1){
-    const one=document.createElement('div'); one.className='mtabs';
-    const lab=document.createElement('span'); lab.className='mone';
-    lab.textContent=grp.views[0].label;
-    one.appendChild(lab); nav.appendChild(one);
-  }
-  if(grp.views.length>1){
-    const row=document.createElement('div'); row.className='mtabs';
-    for(const v of grp.views){
-      const b=document.createElement('button');
-      b.className='mpill'+(modelView===v.key?' active':''); b.textContent=v.label;
-      b.addEventListener('click', ()=>{ modelView=v.key; renderModelNav(); renderModelView(); });
-      row.appendChild(b);
-    }
-    nav.appendChild(row);
-  }
-}
-
-
-
-// ---- Intended vs done: did the work stay inside what was approved -------------
-// The task file says what it set out to change; the log says what it actually
-// touched. Both were already being collected and nobody was putting them side by
-// side — which is the difference between a diagram and change governance.
-// One line in the project's record whenever somebody takes an answer from the
-// model. Reaching for the model instead of the files is the thing being measured,
-// and it is the same act whether an agent does it or a person does.
 function recordAnswer(entry){
   if(!selected || modelSrc) return;              // a shared snapshot is not this project's record
   /* The ids the answer NAMED, and no others.
@@ -1427,24 +1218,30 @@ async function renderHome(pathStr){
   h+='<div class="hm-top"><div class="hm-name">'+esc(p.name||pathStr.split('/').pop())+'</div>'+
      '<div class="hm-path">'+esc(pathStr)+'</div></div>';
 
-  // No map: the step screens above already handle this and are the only thing shown.
-  // Reaching here means the map vanished between two reads — say so plainly and send
-  // the person back to the one screen that knows what to do about it.
+  // The map is kept in the laboratory, so "no map here" is an ordinary state rather than
+  // a loss — nothing on this disk went missing. Previously this branch printed "the map is
+  // gone", offered a button that redrew the same screen, and stopped: everything else this
+  // machine does know about the project — what needs a person, the queue, the record — was
+  // hidden behind a dead end. Say what is missing, point at the screen that can fix it, and
+  // carry on drawing the rest.
+  h+='<div class="hm-hero'+(o.exists?'':' empty')+'">';
   if(!o.exists){
-    h+='<div class="hm-hero empty"><div class="hm-hero-h">The map is gone</div>'+
-       '<p>There is no the laboratory in this folder any more. Nothing is broken — it just has to be made again.</p>'+
-       '<div class="hm-next"><button class="run" data-go="restart">Start again</button></div></div></div>';
-    view.innerHTML=h; wire(); return;
-  }
-
-  // --- what the context replaced -------------------------------------------
-  h+='<div class="hm-hero">';
-  if(s.answers){
+    h+='<div class="hm-hero-h">No map of this product yet</div>'+
+       '<p>The map is built and kept in the laboratory — it is never written into this folder. '+
+       'Point this machine at a laboratory that has read this repository, and everything below fills in.</p>'+
+       '<div class="hm-next"><button class="run" data-go="lab">Connect a laboratory</button></div>';
+  } else if(s.answers){
     // Two different claims, and only the first is about size. The second is the one
     // people actually want: not "how much less was read" but "would I have found all
     // of this by searching?" — and an object the request never named is the witness.
-    h+='<div class="hm-big">'+s.ratio.toFixed(1)+'×</div><div class="hm-big-l">less read to answer</div>'+
-       (s.asked
+    //
+    // The headline is a measured fact or it is nothing. Nothing records the size of the
+    // source an answer stood in any more — that is read where the repository is read, in
+    // the laboratory — so the division has no numerator, and "0.0×" set in the largest
+    // type on the screen is a claim rather than a missing value.
+    const measured = s.asked > 0 && s.askedWould > 0;
+    h+=(measured ? '<div class="hm-big">'+s.ratio.toFixed(1)+'×</div><div class="hm-big-l">less read to answer</div>' : '')+
+       (measured
          ? '<p><b>'+s.asked+' answer'+(s.asked===1?'':'s')+'</b> to a question, '+KB(s.askedServed)+' in all. '+
            'What they covered lives in <b>'+s.askedFiles+' file'+(s.askedFiles===1?'':'s')+'</b> — '+KB(s.askedWould)+
            ' of source.'+
@@ -1453,7 +1250,8 @@ async function renderHome(pathStr){
              'that in would put one call in charge of the number.' : '')+
            ' A fact about this repository, not a claim about what an agent would otherwise have done with it.</p>'
          : '<p><b>'+s.answers+' answer'+(s.answers===1?'':'s')+'</b> served from the model, '+KB(s.served)+' in total. '+
-           'None of them named an object yet, so there is nothing to compare against source.</p>')+
+           'How much source they replaced is not counted on this machine: the repository is read where the map '+
+           'is made, so that comparison arrives with the map.</p>')+
        (s.linked
          ? '<p class="hm-linked"><b>'+s.linked+'</b> of the <b>'+s.objects+'</b> objects in those answers '+
            'share no word with what was asked — they were reached by following links. '+
@@ -1516,11 +1314,24 @@ async function renderHome(pathStr){
   }
 
   // --- what you have --------------------------------------------------------
+  // "Your product, mapped" used to stand first here, counting things and adding up bytes
+  // off a model file on this disk. There is no such file, so both numbers were invented —
+  // one of them by a function that does not exist. The Model tab shows the laboratory's own
+  // totals, which are the only ones anybody should be quoting.
+  //
+  // Freshness is a positive claim, and it is made by whoever holds the map. Nothing here
+  // compares anything: `stale` arrives as a literal false, so "Matches your code" was said
+  // about a repository nobody had looked at. The card claims it only when the answer
+  // actually carries a freshness signal — which is what the laboratory sends with the map,
+  // and which this screen will pass on the day it is given one.
+  const freshKnown = !!(o.freshness || o.stale || o.staleFile);
   h+='<div class="hm-sec">What you have</div><div class="hm-row">'+
-     card('Your product, mapped', objects+' things', countLinks(modelData&&modelData.model||{})+' connections between them · '+KB(o.model.bytes)+' in all', 'model')+
      card('Read out of your code', o.source.files+' file'+(o.source.files===1?'':'s'), KB(o.source.bytes)+' of code, read once so nobody has to read it again', null)+
-     card('Still true?', o.stale?'Your code has moved on':'Matches your code',
-          o.stale? esc(o.staleFile||'')+' changed after the map was made — ask your assistant to refresh it' : 'Nothing has changed since the map was made', 'model', o.stale?'warn':'')+
+     (freshKnown
+       ? card('Still true?', o.stale?'Your code has moved on':'Matches your code',
+              o.stale? esc(o.staleFile||'')+' changed after the map was made — ask the laboratory to read it again' : 'Nothing has changed since the map was made', 'model', o.stale?'warn':'')
+       : card('Still true?', 'Not known here',
+              'The map states its own freshness, and this machine has not been handed one. The Model tab says it before it draws anything.', 'model'))+
      '</div>';
 
   // --- the record -----------------------------------------------------------
@@ -1547,15 +1358,19 @@ async function renderHome(pathStr){
     }));
     view.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{
       const g=b.dataset.go, arg=b.dataset.arg;
-      if(g==='restart'){ renderHome(pathStr); return; }
       if(g==='mcp'){ setTab('settings'); setupSub='mcp'; renderDetail(); return; }
       if(g==='build-model'||g==='skill'){ setTab('settings'); setupSub='skills'; renderDetail(); return; }
-      if(g==='impact'){ setTab('model'); modelView='impact'; if(arg) impactPick=arg; renderModelNav(); renderModelView(); return; }
-      if(g==='spec'||g==='ownership'||g==='model'){
-        setTab('model');
-        if(g!=='model') modelView=g;
-        renderModelNav(); renderModelView(); return;
-      }
+      // Everything about the product opens the Model tab, which reads the laboratory.
+      //
+      // 'lab' arrives from the attention list ("Connect one"). There is no lab tab and no
+      // lab pane, so setTab('lab') took the active class off every tab and every pane and
+      // left an empty frame; the Model tab is where a laboratory is actually reached, and
+      // unconnected it draws the card with the sign-in and the key.
+      //
+      // 'impact', 'spec' and 'ownership' used to open a sub-view of a model held on this
+      // disk. Those sub-views are gone with it, so asking for one by name is a way to land
+      // nowhere. The map the laboratory serves is what the tab shows now.
+      if(g==='lab'||g==='model'||g==='impact'||g==='spec'||g==='ownership'){ setTab('model'); return; }
       setTab(g);
     }));
   }
@@ -1582,111 +1397,6 @@ let designData = null, designFor = null, designAdd = null, designOpen = null;
 let designOn = false;
 
 
-const DESIGN_KINDS = [
-  ['function',  'Action',        'sf',   'Something the product does — a server function.'],
-  ['entity',    'Business object','ent', 'A thing the product is about, with fields.'],
-  ['route',     'Endpoint',      'rt',   'A contract something outside calls.'],
-  ['frontend',  'Screen',        'fe',   'What a person sees.'],
-  ['event',     'Event',         'ev',   'A signal one part raises and another reacts to.'],
-  ['process',   'Journey',       'proc', 'A path a person walks, step by step.'],
-  ['module',    'Area',          'mod',  'A part of the product, in the business’s words.'],
-];
-
-
-
-
-
-
-
-
-
-// Where the code does not do what the product says it does.
-//
-// Kept out of the model on purpose: the model is derived from code and rebuilt
-// whole, and these are judgements a person made about the gap between two
-// sources. A rebuild would throw them away.
-let specFilter = 'open';
-
-
-// How the product changed between two versions of the model.
-//
-// The versions are the project's own git history of the laboratory — nothing is
-// stored here for it. That is why this works on a repository that ran for a year
-// before it ever saw this dashboard: the record was already being kept.
-let histCache=null, histFrom=null, histTo=null;
-
-
-async function renderModelView(){
-  const view=document.getElementById('modelView'); if(!view||!modelData) return;
-  const seq=++modelViewSeq;
-  hudDrop();          // the canvas runs a loop; leaving a view must stop it
-  const m=modelData.model;
-  if(modelView==='logic') return renderLogic(view, m, seq);
-  if(modelView==='overview') return renderOverview(view, modelData, seq);
-  if(modelView==='journeys') return renderProcesses(view, m, seq);
-  if(modelView==='impact') return renderImpact(view, m, seq);
-  if(modelView==='timeline') return renderTimeline(view, m, seq);
-  if(modelView==='decisions') return renderDecisions(view, m, seq);
-  if(modelView==='events') return renderEvents(view, m, seq);
-  if(modelView==='ownership') return renderOwnership(view, m, seq);
-  if(modelView==='confidence') return renderConfidence(view, m, seq);
-  if(modelView==='mismatch') return renderMismatch(view, m, seq);
-  if(modelView==='changed') return renderChanged(view, m, seq);
-  if(modelView==='spec') return renderSpec(view, m, seq);
-  if(modelView==='design') return renderDesign(view, m, seq);
-  view.innerHTML='';
-  const box=document.createElement('div'); view.appendChild(box);
-  if(modelView==='map'){
-    // This is the view shown to a client, so say what the picture means in their words.
-    const layerData = mapLayer==='none' ? null : await mapLayerData(m);
-    box.appendChild(mapLayerBar(layerData));
-    box.insertAdjacentHTML('beforeend', viewHead('map'));
-    const cap=document.createElement('div'); cap.className='map-cap';
-    // No apostrophes in here on purpose: this string is emitted from a template literal.
-    const structure='A line means one area touches another: <b>writes X</b> — it changes data owned by that area \u00b7 <b>uses</b> — its screens call that area \u00b7 <b>calls</b> — it triggers logic over there \u00b7 a named signal is an event one area raises and another reacts to.';
-    // With a layer on, the layer is what the picture now means. Leaving the structure
-    // paragraph in the prominent slot and demoting the layer to a grey line in the
-    // toolbar inverts that — readers looked at the big text, saw it describe the plain
-    // map, and reported the layer as having no explanation at all.
-    if(layerData){
-      const name=(MAP_LAYERS.find(l=>l.key===mapLayer)||{}).label||mapLayer;
-      cap.innerHTML='<b>'+esc(name)+'</b> — '+esc(layerData.legend)+
-        '<span class="map-cap2">The blocks and lines are unchanged: '+structure+'</span>';
-    } else {
-      cap.innerHTML=structure;
-    }
-    box.appendChild(cap);
-    const d=document.createElement('div'); box.appendChild(d);
-    // Areas are containers now, not summaries: "2 screens · 2 actions" is a thing
-    // you can open rather than a claim you have to take on trust.
-    const scene=window.hudSceneProductMap
-      ? hudSceneProductMap(m, layerData, { onSelect:(id)=>{ if(id) openContextPopup(kindOf(id), id); } })
-      : null;
-    return renderHud(d, scene, seq);
-  }
-  if(modelView==='er'){ box.innerHTML=viewHead('er');
-    const d=document.createElement('div'); box.appendChild(d);
-    return hudRenderSpec(d, graphER(m), m, {title:'DATA', subtitle:'BUSINESS OBJECTS AND WHAT LINKS THEM'}, seq); }
-  if(modelView==='flow'){
-    // Areas and what moves between them, not every object at once. The caption
-    // has to say how to read a line, because "Order" on an arrow is only obvious
-    // once you know the arrow points the way the data travels.
-    box.insertAdjacentHTML('beforeend', viewHead('flow'));
-    const cap=document.createElement('div'); cap.className='map-cap';
-    cap.innerHTML='<b>A line is data moving</b>, and it points the way it travels — the label names what moves: '+
-      'an object written into another area, an object read out of the area that owns it, an event one area raises '+
-      'and another handles, or an endpoint answering a screen.';
-    box.appendChild(cap);
-    const d=document.createElement('div'); box.appendChild(d);
-    const scene=window.hudSceneDataFlow
-      ? hudSceneDataFlow(m, { onSelect:(id)=>{ if(id) openContextPopup(kindOf(id), id); } })
-      : null;
-    if(scene) return renderHud(d, scene, seq);
-    return hudRenderSpec(d, graphFlow(m), m, {title:'DATA FLOW', subtitle:'WHERE DATA COMES FROM AND WHERE IT GOES'}, seq);
-  }
-  view.innerHTML='<div class="model-empty">No data for this diagram.</div>';
-}
-
 function fsClose(){ const ov=document.getElementById('fsOverlay'); if(ov){ ov.classList.remove('show'); ov.innerHTML=''; } }
 
 
@@ -1706,7 +1416,7 @@ function mountOverlay(ov){ const h=overlayHost(); if(ov.parentNode!==h) h.append
 // Entering or leaving fullscreen moves whatever is open along with it.
 document.addEventListener('fullscreenchange', ()=>{
   const h=overlayHost();
-  for(const id of ['ctxOverlay','taskOverlay','addOverlay','pvOverlay','shareOverlay']){
+  for(const id of ['ctxOverlay','taskOverlay','addOverlay','pvOverlay']){
     const o=document.getElementById(id);
     if(o && o.classList.contains('show') && o.parentNode!==h) h.appendChild(o);
   }
@@ -1826,13 +1536,28 @@ function queuePrice(file){
   };
 }
 
+/* Здесь лежал целый слой: рисование графа модели, подменю смотрелки и окно
+ * «поделиться картой». Он остался от времени, когда модель строилась и хранилась
+ * на этой машине.
+ *
+ * Модель уехала в лабораторию, а вместе с ней ушли и функции, на которых слой
+ * стоял: kindOf, labelOf, objById, blastRadius — их в этом репозитории нет ни
+ * одной. То есть слой не просто не нужен: любая ветка, до него дотянувшаяся,
+ * падала с ReferenceError. Держался он лишь на том, что дотянуться было неоткуда —
+ * окно «поделиться» включалось переменной, которую никто не выставляет.
+ *
+ * Вырезан целиком, и вместе с ним — таблица наших видов объектов с приставками
+ * идентификаторов. Ей в открытом репозитории не место: клиент видит смысл своего
+ * продукта, но не то, из чего у нас собрана модель. Карту и радиус рисует
+ * вкладка Model по проекции от лаборатории. */
+
 function queueImpact(file){
-  if(!modelData || !modelData.model || modelFor!==selected || !changesData || changesFor!==selected) return null;
-  const t=(changesData.tasks||[]).find(x=>x.file===file);
-  if(!t || !t.ids.length) return null;
-  const r=riskOf(blastRadius(t.ids, modelData.model), modelData.model);
-  return { level:r.level, n:t.ids.length, approved:t.approved };
+  /* Радиус изменения знает лаборатория, а не этот файл. Пока вкладка Model не
+   * отдаст его вместе с задачей, здесь честно нечего показать — и это лучше
+   * числа, посчитанного ни по чему. */
+  return null;
 }
+
 
 let auSel = null;   // which page cell is expanded
 // The audit report the skill asks for leads with the gaps, and so does this: a panel that
@@ -2099,13 +1824,12 @@ function openAddModal(){
   });
   setTimeout(()=>inp.focus(), 40);
 }
-// Dashboard chrome. A shared view has no project list, no search and nothing to refresh
-// on focus — these elements do not exist on that page.
-if(!SHARE){
-  document.getElementById('addBtn').addEventListener('click', openAddModal);
-  searchEl.addEventListener('input', renderList);
-  window.addEventListener('focus', ()=>load(true)); // refresh folder status on return
-}
+/* Обвязка пульта. Условие «а вдруг это страница поделённой карты» отсюда ушло
+ * вместе с самой такой страницей: включалась она переменной, которую в этом
+ * репозитории не выставляет никто. */
+document.getElementById('addBtn').addEventListener('click', openAddModal);
+searchEl.addEventListener('input', renderList);
+window.addEventListener('focus', ()=>load(true)); // refresh folder status on return
 
 // drag & drop reorder
 let dragEl = null;
@@ -2480,62 +2204,6 @@ document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ fsClose(); for
 // ---------- boot ----------
 // A shared view has no projects to list, no bridge to poll and no environment to ask
 // about — every one of those calls would 404 on a page served from somewhere else.
-function bootShare(){
-  modelData = { exists:true, model:SHARE.model||{}, index:SHARE.index||null,
-                brief:SHARE.brief||null, shared:[], stale:null, ingest:null, src:null };
-  const nm=document.getElementById('shareName');
-  if(nm) nm.textContent = SHARE.name || (SHARE.index && SHARE.index.project) || 'Product model';
-  const at=document.getElementById('shareAt');
-  if(at && SHARE.index && SHARE.index.at) at.textContent = 'model built '+fmtTime(SHARE.index.at);
-  renderModelNav();
-  renderModelView();
-}
-  // Coming back to the tab shows current state at once, rather than up to four
-  // seconds of whatever was frozen on it.
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.hidden || !selected) return;
-    if(activeTab==='tasks') refreshTasks(selected);
-    else if(activeTab==='queue') loadQueue(selected);
-    else if(activeTab==='team') teamPoll();
-    else if(activeTab==='home') renderHome(selected);
-  });
-if(SHARE){ bootShare(); }
-else {
-  fetch('/api/env').then(r=>r.json()).then(d=>{ PICKER_OK = !!d.pickerAvailable; if(d.relayUrl) RELAY_URL_DEFAULT=d.relayUrl; if(d.previewOrigin) PV_ORIGIN=d.previewOrigin; if(d.preview===false){ PREVIEW_OK=false; renderDetail(); } }).catch(()=>{});
-  loadSkillsList();
-  load();
-  teamPoll();
-  // Poll for teammates only when there is a bridge to poll and somebody is looking
-  // at this window. It used to run every 3.5 seconds forever, next to a task refresh
-  // every 4 — thirty-odd requests a minute at a screen nobody was touching, which is
-  // what a tester saw in their network panel and reasonably called a storm. Solo, with
-  // no team connected, it now makes none at all.
-  setInterval(()=>{
-    if(document.hidden) return;
-    const live = teamState && (teamState.connected || teamState.connecting);
-    if(live || activeTab==='team') teamPoll();
-  }, 3500);
-}
-
-
-/* =========================================================================
-   Change reach — what a piece of work touches, and what that reaches.
-
-   The model says how the product works now. It cannot, on its own, answer
-   "what will this change break", because that question is about a proposed
-   change and the model has no notion of one. These functions supply it: a
-   task names the objects it will touch, and the graph says what sits
-   downstream of those objects.
-   ========================================================================= */
-
-let changesData = null;              // {tasks, history, heat, knownIds}
-let changesFor  = null;              // the project path changesData belongs to
-
-
-/* ---------------- Impact — what a piece of work changes, before it runs ---------------- */
-let impactPick = null;               // file name of the selected task, or '__adhoc'
-let adhocIds = [];                   // objects picked by hand for a what-if estimate
-
 async function loadChanges(force){
   const p = selected; if(!p) return null;
   if(!force && changesData && changesFor===p) return changesData;
@@ -2560,39 +2228,6 @@ const COL_LABEL = { todo:'todo', inprogress:'running', verify:'verify', done:'do
 
 
 // Searching the model by name so a change can be described before a task exists.
-function redrawAdhoc(m){
-  const br=blastRadius(adhocIds,m);
-  drawImpactDetail({ t:{file:'__adhoc',col:'',title:'What if we change…',ids:adhocIds,declared:true,approved:null,adhoc:true},
-    br, risk:riskOf(br,m) }, m);
-}
-function wireAdhocSearch(m){
-  const inp=document.getElementById('impSearch'), sug=document.getElementById('impSugg');
-  if(!inp||!sug) return;
-  const pool=[];
-  for(const [k,coll] of Object.entries(KIND_COLLECTION))
-    for(const o of (m[coll]||[])) if(o&&o.id) pool.push({id:o.id, k, label:labelOf(o.id,m)});
-  const draw=()=>{
-    const q=inp.value.trim().toLowerCase();
-    if(!q){ sug.innerHTML=''; return; }
-    const hits=pool.filter(x=>!adhocIds.includes(x.id) &&
-      (x.label.toLowerCase().includes(q)||x.id.toLowerCase().includes(q))).slice(0,12);
-    sug.innerHTML = hits.length
-      ? hits.map(x=>'<button class="imp-sg" data-id="'+esc(x.id)+'"><span class="k">'+esc(x.k)+'</span>'+esc(x.label)+'</button>').join('')
-      : '<span class="imp-none">Nothing in the model matches that.</span>';
-    sug.querySelectorAll('.imp-sg').forEach(b=>b.addEventListener('click',()=>{
-      adhocIds=adhocIds.concat([b.dataset.id]); inp.value=''; redrawAdhoc(m);
-      const again=document.getElementById('impSearch'); if(again) again.focus();
-    }));
-  };
-  inp.addEventListener('input', draw);
-  draw();
-}
-
-/* ---------------- The radius, drawn ----------------
-   A node per reached object is never readable: on real tasks one hop already reaches
-   up to 150 objects. It is also the wrong question. What someone deciding whether to
-   run a task needs is: what does it change, whose part of the product does that touch,
-   and which journeys can it break. Three columns, each small enough to read. */
 const IMP_MAX_SEEDS = 14;
 
 function kindWord(k, n){
@@ -2600,113 +2235,6 @@ function kindWord(k, n){
     event:'event', statusFlow:'lifecycle', reaction:'rule', serverUnit:'unit', field:'field'}[k]||k;
   return n+' '+w+(n===1?'':'s');
 }
-
-function graphImpact(named, m, hops){
-  const H = hops==null ? 2 : hops;
-  const full = blastRadius(named, m, H);
-  const nodes=[], edges=[];
-  const seedIds=[...full.dist.entries()].filter(([,d])=>d===0).map(([id])=>id);
-  // What each named object reaches on its own — that is what makes the arrows honest
-  // rather than "everything connects to everything".
-  const reachOf=new Map();
-  for(const id of seedIds) reachOf.set(id, blastRadius([id], m, H).dist);
-
-  const shownSeeds = seedIds.slice(0, IMP_MAX_SEEDS);
-  const seedRest = seedIds.length - shownSeeds.length;
-  for(const id of shownSeeds){
-    const mod=moduleOf(id,m), label=labelOf(id,m);
-    const sub=(kindOf(id)||'')+(mod?' · '+labelOf(mod,m):'');
-    const W=Math.max(180, Math.min(268, label.length*7.4+50));
-    const L=wrapPx(sub, W-15-11, CW_MONO);
-    nodes.push({id:'s_'+mSafe(id), w:Math.round(W), h:L.length?subH(L.length):44,
-      meta:{kind:kindOf(id)==='statusFlow'?'status':kindOf(id), label, sub, subLines:L,
-            heat:1, ref:{k:kindOf(id), id}}});
-  }
-  if(seedRest>0) nodes.push({id:'s_more', w:190, h:44,
-    meta:{kind:'entity', label:'+'+seedRest+' more', sub:'also changed directly', subLines:['also changed directly'], heat:1, ref:null}});
-
-  // Areas the change lands in, each saying what of it is in reach.
-  const byArea=new Map();
-  for(const [id,d] of full.dist){
-    if(d===0) continue;
-    const mod=moduleOf(id,m); if(!mod) continue;
-    if(!byArea.has(mod)) byArea.set(mod, {});
-    const k=kindOf(id); byArea.get(mod)[k]=(byArea.get(mod)[k]||0)+1;
-  }
-  const areaOrder=[...byArea.entries()].sort((a,b)=>
-    Object.values(b[1]).reduce((s,n)=>s+n,0)-Object.values(a[1]).reduce((s,n)=>s+n,0));
-  for(const [mod,counts] of areaOrder){
-    const parts=['entity','function','route','frontend','event','statusFlow']
-      .filter(k=>counts[k]).map(k=>kindWord(k,counts[k]));
-    const label=labelOf(mod,m), sub=parts.join(' · ');
-    const W=Math.max(200, Math.min(290, Math.max(label.length*7.4+50, sub.length*6.2+30)));
-    const L=wrapPx(sub, W-15-11, CW_MONO);
-    nodes.push({id:'a_'+mSafe(mod), w:Math.round(W), h:L.length?subH(L.length):44,
-      meta:{kind:'module', label, sub, subLines:L, heat:0.5, ref:{k:'module', id:mod}}});
-    for(const sid of shownSeeds){
-      const r=reachOf.get(sid); if(!r) continue;
-      let touches=false;
-      for(const [id,d] of r){ if(d>0 && moduleOf(id,m)===mod){ touches=true; break; } }
-      if(touches) edges.push({from:'s_'+mSafe(sid), to:'a_'+mSafe(mod), kind:'spine'});
-    }
-  }
-
-  // The journeys a person walks through — the answer to "what will users notice".
-  const procs=(full.byKind.process||[]).map(x=>objById(x.id,m)).filter(Boolean);
-  const journeys=procs.filter(isJourney), internal=procs.length-journeys.length;
-  for(const j of journeys){
-    const label=j.name||j.id, sub=(j.steps||[]).length+' steps · '+(j.audience||j.triggerKind||'journey');
-    const W=Math.max(190, Math.min(280, label.length*7.4+50));
-    const L=wrapPx(sub, W-15-11, CW_MONO);
-    nodes.push({id:'j_'+mSafe(j.id), w:Math.round(W), h:L.length?subH(L.length):44,
-      meta:{kind:'process', label, sub, subLines:L, heat:0.7, ref:{k:'process', id:j.id}}});
-    const hit=new Set();
-    for(const st of (j.steps||[])){ const mod=st.refId&&full.dist.has(st.refId)?moduleOf(st.refId,m):null; if(mod&&byArea.has(mod)) hit.add(mod); }
-    for(const mod of hit) edges.push({from:'a_'+mSafe(mod), to:'j_'+mSafe(j.id), kind:'effect'});
-  }
-  if(internal>0){
-    nodes.push({id:'j_internal', w:210, h:44,
-      meta:{kind:'process', label:internal+' internal flow'+(internal===1?'':'s'),
-            sub:'machinery, nobody walks through it', subLines:['machinery, nobody walks through it'], heat:0.25, ref:null}});
-    // Without edges it lands in the first column and reads as something the task changes.
-    const hit=new Set();
-    for(const pr of procs){ if(isJourney(pr)) continue;
-      for(const st of (pr.steps||[])){ const mod=st.refId&&full.dist.has(st.refId)?moduleOf(st.refId,m):null; if(mod&&byArea.has(mod)) hit.add(mod); } }
-    for(const mod of hit) edges.push({from:'a_'+mSafe(mod), to:'j_internal', kind:'effect'});
-  }
-
-  return { direction:'RIGHT', nodes, edges, seedRest, areas:areaOrder.length, journeys:journeys.length };
-}
-
-async function drawImpactGraph(box, named, m, seq, task){
-  if(!box) return;
-  const spec=graphImpact(named, m);
-  if(!spec.nodes.length){ box.innerHTML='<div class="model-empty">Nothing to draw — this task names no object that is in the model.</div>'; return; }
-  const note=document.createElement('div'); note.className='map-cap';
-  note.innerHTML='Read it left to right: <b>what the task changes</b> → <b>the areas that reaches</b>, each saying how much of it is in reach → '+
-    '<b>the journeys that run through those areas</b>. Click any node for its own context.'+
-    '<span class="map-cap2">Areas and journeys are grouped on purpose: one hop out already reaches over a hundred objects on a real task, '+
-    'and a node for each of them is a picture nobody can read. The exact counts are in the cards above.</span>';
-  box.innerHTML=''; box.appendChild(note);
-  const d=document.createElement('div'); box.appendChild(d);
-  // The HUD draws the same three columns, except an area now opens into exactly
-  // which of its objects are in reach — the thing the flat picture could not say.
-  const scene=window.hudSceneImpact
-    ? hudSceneImpact(task, m, blastRadius(named, m, 2),
-        { onSelect:(id)=>{ if(id) openContextPopup(kindOf(id), id); } })
-    : null;
-  renderHud(d, scene, seq);
-  if(seq!=null && !viewAlive(seq)) box.innerHTML='';
-}
-
-// ----- Change audit -----
-// The one screen that measures the thing the product is sold on. A request rarely
-// lands in one pass: it lands, somebody says "not like that", and the rest is the
-// person walking the agent to the finish. Both halves are timed separately here,
-// grouped by the request rather than by the person — deliberately, and permanently:
-// there is no per-person cut in this screen, the API or the export, and there is
-// not going to be one.
-let caDays = 7, caIdle = 4, caData = null;
 
 const caHrs = (min)=>{
   if(!min) return '0<small>m</small>';
@@ -3093,7 +2621,9 @@ const UNLOCKS = [
 ];
 
 function stepRail(step){
-  const names = ['Connect your assistant', 'Make the map', 'Everything else'];
+  // Step two connects the laboratory; nothing is made here. The rail is the one line
+  // that says what the screen it sits on is for, so it says the same thing.
+  const names = ['Connect your assistant', 'Connect the laboratory', 'Everything else'];
   let h = '<div class="st-rail">';
   names.forEach((n,i)=>{
     const k = i+1;
@@ -3155,8 +2685,9 @@ function renderSteps(view, pathStr, d){
       : (window.__GITMIR_CLI__ ? 'gitmir mcp add'
         : 'claude mcp add -s user gitmir -- node '+qq(dir+'/mcp.ts'));
     h += '<h2 class="st-h">Two moves and your assistant is connected</h2>'
-      +  '<p class="st-p">Nothing is asked of you — no account, no password, nothing leaves your computer. '
-      +  'It takes about ten seconds.</p>'
+      +  '<p class="st-p">Registering the server asks nothing of you — no account, no password, and nothing '
+      +  'leaves your computer: it writes one line into your assistant\'s config. The map itself is read from '
+      +  'the laboratory, with a key you set in the next step. It takes about ten seconds.</p>'
       +  '<div class="st-agent"><span class="st-agent-l">Which assistant</span>'+agentRadios('')+'</div>'
       +  '<div class="st-do">'
       +  '<div class="st-do-c one"><div class="num">1</div>'
@@ -3180,120 +2711,83 @@ function renderSteps(view, pathStr, d){
   }
 
   else {
-    // Connected, or pasting by hand. One thing left, and it is three moves — shown as
-    // three cards with numbers you can read across the room.
+    // The last thing between somebody and the product is connecting the laboratory —
+    // not building anything here.
     //
-    // An empty folder gets a box to type in rather than a sentence with a hole in it.
-    // The hole version was pasted into a chat with "(describe it in a few sentences)"
-    // still in it, and the assistant — correctly — refused to invent a product.
-    const brief = d.brief || '';
-    const say = d.hasCode
-      ? 'Build the GitMir model for this project'
-      : (brief
-          ? 'Read ' + brief + ' and build the GitMir model from it'
-          : '');
+    // This screen used to say "open your agent in this folder and tell it to build the
+    // GitMir model", promise that the map lands in a folder inside the project, and wait
+    // for map files to appear. Nothing here builds a model, no such folder is written,
+    // and step three only ever arrives with a key — so the one screen whose job is to end
+    // could not end. It now asks for the only thing that actually moves it on.
+    const L = d.laboratory || {};
+    const keys   = L.keys   || 'https://lab.gitmir.com/account/access';
+    const signUp = L.signUp || 'https://lab.gitmir.com/signup';
+    const setKey = 'export GITMIR_LAB_KEY=your-key-here';
+    const brief  = d.brief || '';
+
     h += '<div class="st-mid">'
-      +  '<div class="big">Now we make the map of your product</div>'
-      +  '<p>' + (d.hasCode
-           ? 'There is code in this folder. Your assistant reads it once and writes down what the product actually is — '
-             + 'its parts, what they do, what happens where. That written-down product is the map, and everything here is built on it.'
-           : brief
-             ? 'You wrote it down in <b>'+esc(brief)+'</b>. Your assistant reads that and turns it into the map — '
-               + 'the parts of your product, what they do, what happens where. The map first, the code after it.'
-             : 'This folder is empty, which is the best moment to do this. Nobody can map a product nobody has described yet, '
-               + 'so write a few sentences about what you want to build. That is all it takes.')
-      +  '</p></div>';
+      +  '<div class="big">Now connect the laboratory</div>'
+      +  '<p>The map of your product — its parts, what they do, and what a change would reach — is built and '
+      +  'kept at <b>lab.gitmir.com</b> from the code in this repository. It is not built on this machine and '
+      +  'nothing about it is written into this folder. The dashboard reads it with a key, and so does your '
+      +  'assistant. Everything that does not need the map — the task queue, the findings, the audits — has been '
+      +  'working all along without one.</p></div>';
 
     h += '<div class="st-do">';
 
-    // 1 — where to say it
-    // The first thing on the first screen used to name one product. Somebody who
-    // works in the other one had no way to know this was for them either.
-    // A button per agent, rather than a switch that renames one. The first screen
-    // of the product should not make anybody work out which one is armed.
     h += '<div class="st-do-c one"><div class="num">1</div>'
-      +    '<h5>Open your agent here</h5>'
-      +    '<p>A terminal opens in this project with it already running. It has to be <b>this</b> folder — '
-      +    'that is the only place it can write your map.</p>'
+      +    '<h5>Get a key</h5>'
+      +    '<p>Sign in to the laboratory and open your access page. It is the same key your assistant uses '
+      +    'through MCP, so this is done once for both.</p>'
+      // Links, not buttons: they open the laboratory in another tab. The button classes
+      // are class-scoped, so they style an <a> too — the two properties a browser gives a
+      // link and not a button are the ones set here.
       +    '<div class="act two">'
-      +      Object.entries(AGENTS).map(([k,label])=>
-             '<button class="run big-btn" data-run="1" data-run-agent="'+k+'">▶ '+label+'</button>').join('')
+      +      '<a class="run big-btn" style="justify-content:center;text-decoration:none" '
+      +        'href="'+esc(keys)+'" target="_blank" rel="noopener">Open my access page</a>'
+      +      '<a class="ghost big-btn" style="display:inline-flex;justify-content:center;text-decoration:none" '
+      +        'href="'+esc(signUp)+'" target="_blank" rel="noopener">I have no account yet</a>'
       +    '</div></div>';
 
-    // 2 — what to say, or what to write first
-    if(!d.hasCode && !brief){
-      h += '<div class="st-do-c two wait"><div class="num">2</div>'
-        +    '<h5>Say what you want to build</h5>'
-        +    '<p>A few sentences in your own words. Who uses it, what they do with it, what it has to get right.</p>'
-        +    '<textarea class="st-ta" id="st-brief" placeholder="A booking site for a small hotel. Guests pick dates and a room, pay a deposit, and get a confirmation. The owner sees today\u2019s arrivals and can block dates when a room is being repaired."></textarea>'
-        +    '<div class="act"><button class="run big-btn" id="st-save">Save it into the project</button></div></div>';
-    } else {
-      h += '<div class="st-do-c two"><div class="num">2</div>'
-        +    '<h5>Paste this sentence</h5>'
-        +    '<div class="st-say">'+esc(say)+'</div>'
-        +    '<div class="act"><button class="ghost big-btn" data-copy="'+esc(say)+'">Copy it</button></div></div>';
-    }
+    h += '<div class="st-do-c two"><div class="num">2</div>'
+      +    '<h5>Set it as GITMIR_LAB_KEY</h5>'
+      +    '<p>In the environment this dashboard is started from — your shell profile, or the terminal you '
+      +    'launch it in. We never write it to disk ourselves.</p>'
+      +    '<div class="st-cmd"><span>'+esc(setKey)+'</span></div>'
+      +    '<div class="act"><button class="run big-btn" data-copy="'+esc(setKey)+'">Copy the line</button></div></div>';
 
-    // 3 — what is happening, in the agent's own words where it has said any
-    const pr = d.progress;
-    const seen = [];
-    seen.push([d.agentSeen || d.queue, (d.agentSeen || d.queue) ? 'Your assistant is on it' : 'Waiting for your assistant']);
-    seen.push([pr && (pr.stage === 'reading' || pr.stage === 'writing' || pr.stage === 'done'),
-               pr && pr.stage === 'reading' ? 'Reading ' + (d.hasCode ? 'your code' : 'what you wrote')
-             : pr && (pr.stage === 'writing' || pr.stage === 'done') ? 'Read it'
-             : 'Not started reading yet']);
-    seen.push([d.modelFiles > 0,
-               d.modelFiles > 0 ? d.modelFiles+' map file'+(d.modelFiles===1?'':'s')+' written'
-             : pr && pr.stage === 'writing' ? 'Writing the map now…' : 'The map is not written yet']);
-
-    h += '<div class="st-do-c three'+((d.hasCode||brief)?' wait':'')+'"><div class="num">3</div>'
-      +    '<h5>' + (pr && pr.stage === 'blocked' ? 'It needs an answer from you'
-                   : pr && pr.stage === 'writing' ? 'It is writing your map'
-                   : pr && pr.stage === 'failed' ? 'It ran into a problem'
-                   : 'Come back here') + '</h5>';
-
-    if(pr && pr.stage === 'blocked'){
-      h += '<p>Your assistant stopped and asked you something. Answer it in the chat and it carries on.</p>'
-        +  (pr.note ? '<div class="st-say">'+esc(pr.note)+'</div>' : '');
-    } else if(pr && pr.stage === 'failed'){
-      h += '<p>'+esc(pr.note || 'It could not finish. The chat will say why.')+'</p>';
-    } else {
-      h += '<ul class="st-seen">';
-      for(const [ok,label] of seen) h += '<li class="'+(ok?'ok':'')+'"><i></i>'+esc(label)+'</li>';
-      h += '</ul>';
-      if(pr && pr.note && !pr.stale) h += '<p style="margin-top:2px">'+esc(pr.note)+'</p>';
-    }
-
-    h += '<div class="act"><div class="st-wait"><i class="st-dot"></i>'
-      +    (pr && pr.stale ? 'Nothing heard for a while — it may have stopped'
-          : pr && pr.stage === 'blocked' ? 'Paused until you answer'
-          : 'Updating on its own, every few seconds')
-      +  '</div></div></div>';
+    h += '<div class="st-do-c three wait"><div class="num">3</div>'
+      +    '<h5>Start the dashboard again</h5>'
+      +    '<p>The key is read once, when the server starts, so a page already open cannot see one that arrived '
+      +    'after it. Close this dashboard, start it again, and open this project.</p>'
+      +    '<div class="act"><div class="st-wait"><i class="st-dot"></i>No key yet</div></div></div>';
 
     h += '</div>';
 
-    // The thing that actually goes wrong, said out loud.
-    // Pasting by hand never produces a hello, so this cannot depend on one: a queue
-    // on disk is equally good proof that an assistant has been in here and stopped.
+    // An empty folder is the one case where the laboratory has nothing to read. What gets
+    // written here is a plain file in the repository, read along with the code — the map
+    // is still made there, not here.
+    if(!d.hasCode && !brief){
+      h += '<div class="st-hint"><b>This folder is empty, so there is nothing to read yet.</b> '
+        +  'Write a few sentences about what you are building: who uses it, what they do with it, what it has '
+        +  'to get right. It is saved into the repository as a plain file and read along with the code.'
+        +  '<textarea class="st-ta" id="st-brief" placeholder="A booking site for a small hotel. Guests pick dates and a room, pay a deposit, and get a confirmation. The owner sees the day’s arrivals and can block dates while a room is being repaired."></textarea>'
+        +  '<div class="act"><button class="run big-btn" id="st-save">Save it into the project</button></div></div>';
+    }
+
+    // An assistant that stopped to ask something is the one state a person cannot see from
+    // here, and the one that strands them. It has nothing to do with the map.
     if(d.progress && d.progress.stage === 'blocked'){
-      h += '<div class="st-hint"><b>Your assistant is waiting on you</b> — it asked a question in the chat and stopped. '
-        +  'Go and answer it; the map gets written the moment you do.'
+      h += '<div class="st-hint"><b>Your assistant is waiting on you</b> — it asked a question in the chat and '
+        +  'stopped. Go and answer it; it carries on the moment you do.'
         +  (d.progress.note ? '<br><br>It asked: <b>'+esc(d.progress.note)+'</b>' : '')
         +  '</div>';
     }
-    else if((d.agentSeen || d.queue) && !d.modelFiles && !(d.progress && (d.progress.stage==='reading' || d.progress.stage==='writing'))){
-      h += '<div class="st-hint"><b>Your assistant has been here and set the project up — but the map is not written yet.</b> '
-        +  'Nine times out of ten it asked you something in the chat and is waiting on your answer. Go and look at it: '
-        +  (d.hasCode ? 'it may be asking which parts of the code to treat as the product.'
-                      : 'on an empty folder it will ask what you are building — write it in box 2 above, save it, and tell it to read that file.')
-        +  '</div>';
-    }
 
-    h += '<div class="st-note">Already have '+esc(agentName())+' open somewhere else? Fine — just make sure it is open <b>in this folder</b>. '
-      +  'Prefer to do it by hand? '
+    h += '<div class="st-note">Prefer to work by copying and pasting? '
       +  '<button class="st-back" data-go="skill">Open the full instruction</button>'
-      +  '<br><br>The map lands in a folder called the laboratory inside your project. '
-      +  'Plain files you can open and read — nothing hidden, nothing sent anywhere.</div>';
+      +  '<br><br>Nothing about your code is copied into this folder, and the map never lands here: it is read '
+      +  'from the laboratory when a screen or your assistant asks for it.</div>';
 
     h += '<div class="st-un"><div class="st-un-h">And this is what opens up the second it is here</div><div class="st-un-g">';
     for(const [t2,s] of UNLOCKS) h += '<div class="st-un-i"><b>'+esc(t2)+'</b><span>'+esc(s)+'</span></div>';
@@ -3318,17 +2812,9 @@ function renderSteps(view, pathStr, d){
     }catch(e){ d2 = { error:String(e&&e.message||e) }; }
     saveBtn.disabled = false; saveBtn.textContent = 'Save it into the project';
     if(!d2 || !d2.ok){ toast('Could not save it: '+((d2&&d2.error)||'unknown'), true); return; }
-    toast('Saved as '+d2.file+' — now tell Claude to read it');
+    toast('Saved as '+d2.file+' — the laboratory reads it with the rest of the repository');
     renderHome(pathStr);
   });
-  view.querySelectorAll('[data-run]').forEach(b=>b.addEventListener('click', async ()=>{
-    const which = b.dataset.runAgent || agentPick();
-    setAgent(which);                   // the rest of the flow says what you actually started
-    toast('Opening a terminal in this project…');
-    const r = await fetch('/api/open',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ path:pathStr, agent:which })}).catch(()=>null);
-    if(!r || !r.ok) toast('Could not open a terminal. Open one yourself in this folder and run: '+which, true);
-  }));
   // Waiting for a hello that may never come is a dead end: an assistant that never
   // needs a GitMir tool never says one. The way forward must not depend on it.
   wireAgentPick(view, ()=>renderHome(pathStr));
@@ -3351,7 +2837,10 @@ function renderSteps(view, pathStr, d){
     // change when it changes. It used to compare the step alone, which is why an agent
     // could report four stages in a row into a page that never redrew — the exact
     // "nothing happens" people reported.
-    const sig = (x)=> !x ? '' : [x.step, x.agentSeen, x.queue, x.modelFiles, x.brief,
+    // `modelFiles` stood in this list and in the checklist above it. Nothing has ever sent
+    // that field: a map is not made of files here. Whether a laboratory is connected is the
+    // fact this screen now turns on, so that is what it watches.
+    const sig = (x)=> !x ? '' : [x.step, x.agentSeen, x.queue, !!(x.laboratory && x.laboratory.connected), x.brief,
       x.progress && x.progress.stage, x.progress && x.progress.note, x.progress && x.progress.stale].join('|');
     stepPoll = setInterval(async ()=>{
       if(selected !== pathStr || activeTab !== 'home'){ clearInterval(stepPoll); return; }
@@ -3363,7 +2852,7 @@ function renderSteps(view, pathStr, d){
         clearInterval(stepPoll);
         // The one moment in this product worth marking. Somebody just did the thing
         // that makes everything else exist; saying so costs nothing and lands.
-        if(n.step === 3) toast('Your map is here — everything just opened up');
+        if(n.step === 3) toast('The laboratory is connected — everything just opened up');
         else if(n.agentSeen && !d.agentSeen) toast('Your assistant said hello. Connected.');
         else if(n.progress && n.progress.stage === 'blocked'
                 && !(d.progress && d.progress.stage === 'blocked')) toast('Your assistant is asking you something');

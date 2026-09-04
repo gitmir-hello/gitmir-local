@@ -507,7 +507,7 @@ function buildGraph() {
  * Breaks a string into lines that fit. The first line may be narrower than the
  * rest — a value or a tag shares it — which is why two widths go in.
  * A word longer than a whole line is broken rather than allowed to overflow:
- * an id like `sf-refund-order-status` has nowhere to break politely.
+ * a long unbroken name like `refund-order-status-changed` has nowhere to break politely.
  */
 function wrapToWidth(text, size, weight, tracking, firstW, restW) {
   const s = String(text == null ? '' : text);

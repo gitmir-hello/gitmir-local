@@ -17,7 +17,8 @@ where node >nul 2>&1
 if errorlevel 1 (
   echo.
   echo Node.js was not found. Install it from https://nodejs.org
-  echo   Node 18+ runs the dashboard; the optional Team bridge needs Node 22+.
+  echo   Version 22.18 or newer: Node runs this project's TypeScript with no build step,
+  echo   which it can only do from 22.18.
   echo Then run this file again.
   echo.
   pause

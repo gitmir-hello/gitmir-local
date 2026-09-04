@@ -24,7 +24,7 @@ if [ -z "$NODE" ]; then
   done
 fi
 if [ -z "$NODE" ]; then
-  echo "Could not find node. Install Node.js 18+ (22+ if you want the Team bridge) and run this again."
+  echo "Could not find node. Install Node.js 22.18 or newer and run this again."
   exit 1
 fi
 echo "node:      $NODE ($("$NODE" -v))"

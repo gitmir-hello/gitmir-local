@@ -1,11 +1,14 @@
-# The MCP server — the model, inside your editor
+# The MCP server — your queue, inside your editor
 
-The dashboard draws your product model for a person. The MCP server serves the same
-model, as text, to whatever agent you already work in — Claude Code, Cursor, or
-anything else that speaks [MCP](https://modelcontextprotocol.io).
+The dashboard shows the queue, the findings and the approvals to a person. The MCP
+server serves the same records, as text, to whatever agent you already work in —
+Claude Code, Cursor, or anything else that speaks
+[MCP](https://modelcontextprotocol.io).
 
-Both read the same files on disk and share the same arithmetic (`lib/impact.js`), so
-they cannot answer the same question two different ways.
+Both read the same files on disk, so they cannot answer the same question two
+different ways. Questions about the product itself — what it does, what depends on
+what, how far a change reaches — are answered by neither: those go to the
+laboratory, over its own MCP endpoint.
 
 ## Where it runs
 
@@ -72,9 +75,10 @@ one. `mcp-check.ts` speaks the protocol and prints the answer for a person:
 ```
 node mcp-check.ts examples/refund-shop init      # handshake — version, name, what it offers
 node mcp-check.ts examples/refund-shop tools     # the tools and their behaviour hints
-node mcp-check.ts examples/refund-shop model     # what this product is
-node mcp-check.ts examples/refund-shop impact 010-partial-refund.md
-node mcp-check.ts examples/refund-shop history
+node mcp-check.ts examples/refund-shop prompts   # the procedures, served as prompts
+node mcp-check.ts examples/refund-shop setup     # what the project still needs
+node mcp-check.ts examples/refund-shop queue     # what is planned, and what is approved
+node mcp-check.ts examples/refund-shop attention # what needs a person right now
 node mcp-check.ts                                # every command
 ```
 
@@ -91,11 +95,12 @@ Three of its commands write: `new`, `approve`, `withdraw`. The rest only read.
 | `gitmir_skills` · `gitmir_skill` | The written procedures and their full text. Prompts only fire when a person types a slash command; these are tools, so the agent can fetch a procedure and follow it on its own. |
 | `gitmir_queue` | What work is planned, what does each task touch, what is approved? |
 | `gitmir_flag` | Record that the code does not do what the product says. Written at the moment it is noticed, in one call — a finding described only in a reply is gone when the conversation ends. |
-| `gitmir_attention` | What needs a person right now: deviations whose files have since changed, tasks queued without approval, work that has stalled. Each item says what closes it. Call it at the start of a session instead of asking what to do. Connect a laboratory and it also reports what only the model can see — the code having moved past it, planned work reaching further than its ticket admits, parts nobody owns. |
+| `gitmir_attention` | What needs a person right now: deviations whose files have since changed, tasks queued without approval, work that has stalled. Each item says what closes it. Call it at the start of a session instead of asking what to do. It answers from this repository only — what a change reaches, and how far, is a question for the laboratory. |
 | `gitmir_findings` | What is already known to be wrong, what was accepted on purpose and by whom, and what needs re-checking because the code has moved since. |
 | `gitmir_accept_finding` | Record the decision: accepted (needs a name and a reason), fixed, or reopened. |
 | `gitmir_create_task` | Turn a finding into queued work. Refuses to write a task with no `verify` steps — a requirement you cannot check is a wish, not a task. |
 | `gitmir_approve` | Record that a task is approved to run, or withdraw it. Writes the `Approved:` line that travels with the task. |
+| `gitmir_progress` | Say what you are doing right now, so the person watching the dashboard sees a status instead of a blank wait — above all `blocked`, with the question you are waiting on. |
 
 These are the tools that work with nothing but your repository. What the product does,
 what depends on what, and what a change would reach are answered by the laboratory over
@@ -137,16 +142,13 @@ it needs one.
 ## Every answer leaves a line
 
 The server appends one line to `.gitmir/usage.jsonl` for each answer it serves:
-the tool, what was asked, the size of the answer, how many model objects it
-covered, and how big the files are that those objects live in.
+when, which tool, what was asked, and how many bytes went back.
 
-That last pair is the point. It is not an estimate of what an agent would
-otherwise have read — it is a measurement of this repository: these objects, these
-files, this many bytes. The dashboard's first screen adds them up, and anybody can
-read the file and check the arithmetic.
+That is the whole record, and it is the point: it is plain text on your disk, so
+the no-telemetry claim is something you check rather than something you take. The
+dashboard reads the same file, and so can you.
 
-Nothing is sent anywhere. The record exists so the no-telemetry claim is
-checkable instead of merely stated.
+Nothing is sent anywhere.
 
 ## Where a finding lives, and why not in the model
 
@@ -179,8 +181,8 @@ tries.
 
 
 To see it working before pointing it at your own code, use
-[`examples/refund-shop`](../examples/refund-shop) — an invented shop with a model and
-two planned tasks.
+[`examples/refund-shop`](../examples/refund-shop) — an invented shop with three tasks,
+two of them still planned.
 
 ## The skills, without copy-paste
 
@@ -205,7 +207,7 @@ than no hint at all.
 | `gitmir_queue` · `gitmir_findings` · `gitmir_attention` · `gitmir_skills` · `gitmir_skill` | yes | no | yes | no |
 | `gitmir_flag` | no | no | **yes** | no |
 | `gitmir_accept_finding` | no | **yes** | no | no |
-| `gitmir_setup` | no | no | **yes** | no |
+| `gitmir_setup` · `gitmir_progress` | no | no | **yes** | no |
 | `gitmir_create_task` | no | no | **no** | no |
 | `gitmir_approve` | no | **yes** | no | no |
 
@@ -218,8 +220,8 @@ the only thing any tool touches is this machine's own `.gitmir/` and `tasks/` fo
 
 ## What it does not do
 
-- **No repository reading.** It answers from the model. If the model is wrong, the
-  answer is wrong — which is why freshness is in every response.
+- **No source reading.** It answers from `.gitmir/` and `tasks/` — the records people
+  and agents wrote there. It never opens a source file to work something out.
 - **No structured content.** The spec allows a machine-readable object alongside the
   text. The consumer here is a model reading prose, and the arithmetic it needs is in
   the prose already; a second serialization would double the payload to serve client

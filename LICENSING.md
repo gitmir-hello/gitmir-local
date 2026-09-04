@@ -53,8 +53,8 @@ Bundled third-party components in `vendor/` keep their own licenses — see
 
 Note that this repository is the **client**. Connecting your team's machines through
 the GitMir relay is a hosted, subscription service run by GITMIR; the license on this
-code does not grant access to it. See the Team bridge section in the
-[README](README.md).
+code does not grant access to it. See the Team bridge section in
+[SECURITY.md](SECURITY.md) for exactly what it sends and what it does not.
 
 ## Contributing
 

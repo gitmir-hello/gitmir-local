@@ -32,6 +32,12 @@ const MAX_TASK_BYTES = 256 * 1024;       // per incoming task
 const STALE_MS = 75 * 1000;              // silence after which a socket is presumed dead
 const HANDSHAKE_MS = 20 * 1000;          // no 'welcome'/'denied' by then → treat as failed
 
+// The relay every install talks to unless GITMIR_RELAY_URL says otherwise. It must
+// be the public one: a developer's ws://localhost had every Connect on every machine
+// reconnecting to its own box forever. Same host as SHARE_HOST_DEFAULT on purpose —
+// shareEndpoint() derives the https origin from this URL when it is not loopback.
+const RELAY_URL_DEFAULT = 'wss://ide.gitmir.com/relay';
+
 const LEVELS: Level[] = ['local', 'tasks', 'full'];
 const LEVEL_TEXT: Record<Level, string> = {
   local: 'nothing leaves this machine',
@@ -65,7 +71,7 @@ interface Frame {
 const state: RelayState = {
   connected: false, connecting: false,
   key: null, name: 'me', projectPath: null, projectId: null,
-  url: String(process.env.GITMIR_RELAY_URL || 'ws://localhost:4600').trim(),
+  url: String(process.env.GITMIR_RELAY_URL || RELAY_URL_DEFAULT).trim(),
   plan: null, self: null, members: [], activity: [], autoShare: false,
   error: null,   // last actionable failure, surfaced in the UI (denial, bad URL, unsupported Node)
   // How much of this project the OWNER has chosen to mirror on the server. We never
@@ -503,7 +509,17 @@ function openSocket() {
     if (ws !== sock) return;                 // superseded socket — ignore
     state.connected = false; state.members = []; sharedWith = '';
     if (deliberate) { state.connecting = false; return; }
-    log('bridge', `closed (${ev.code}${ev.code === 1006 ? ' — could not reach the relay' : ''})`);
+    const reason = String((ev as CloseEvent).reason || '').slice(0, 200);
+    log('bridge', `closed (${ev.code}${ev.code === 1006 ? ' — could not reach the relay' : ''}${reason ? ` — ${reason}` : ''})`);
+    // The panel reads state.error and nothing else; leaving the reason only in the
+    // activity feed meant an unreachable relay looked like an endless "connecting…"
+    // with no explanation. A 'denied' frame has already said something better, so
+    // the close that follows it must not overwrite it.
+    if (!denied) {
+      state.error = ev.code === 1006
+        ? `Could not reach the relay at ${state.url} — check the Relay URL and that you are online.`
+        : `The relay closed the connection (code ${ev.code}${reason ? `: ${reason}` : ''}).`;
+    }
     scheduleReconnect();
   });
   sock.addEventListener('error', () => {});  // 'close' always follows; handled there
