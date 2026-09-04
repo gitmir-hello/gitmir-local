@@ -214,9 +214,21 @@ of them still planned.
 
 ## Five minutes on your own repository
 
-Connect a laboratory — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy the key
-from your account and export it as `GITMIR_LAB_KEY` — then ask your agent these five
-questions:
+Connect a laboratory — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy your key
+from [your account](https://lab.gitmir.com/account/access), and hand it over once:
+
+```
+gitmir lab ctx_your_key_here     # saved on this machine only, never in a repository
+gitmir lab add                   # let your assistant ask the laboratory directly
+```
+
+`gitmir lab` on its own says whether you are connected and which products it can read.
+You can paste the key on the Model tab of the dashboard instead — same thing, same place
+it is stored. To pin the registration to one repository rather than your whole account,
+`gitmir lab add-here` writes `.mcp.json` that reads the key from `GITMIR_LAB_KEY` instead
+of carrying it, so that file is safe to commit.
+
+Then ask your agent these five questions:
 
 1. What are the main business objects in this product?
 2. Pick one that matters. What depends on it — in both directions?

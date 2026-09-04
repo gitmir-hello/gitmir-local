@@ -85,7 +85,8 @@ function stripFrontmatter(text: string): string {
 import { HANDLE, idList, parseTouches, readTasks } from './lib/read.js';
 import { createTask, setApproval, COLUMNS } from './lib/write.js';
 import { readFindings, writeFinding, setFindingStatus, findingsSummary } from './lib/findings.js';
-import { lab, connected as labConnected, needsLab, view as labView } from './lib/lab.js';
+import { lab, connected as labConnected, needsLab, view as labView,
+  remember as labRemember, forget as labForget } from './lib/lab.js';
 import { installed as connectorInstalled, fetchConnector, run as runConnector } from './lib/connector.js';
 import { readUsage, summarise, sourceBytes, record as recordUse } from './lib/usage.js';
 import { attention, caught, nextSkill } from './lib/attention.js';
@@ -1143,6 +1144,39 @@ const server = http.createServer(async (req, res) => {
         onLine: (l: string) => { try { res.write(l + '\n'); } catch {} } });
       if (!out.ok) { try { res.write('\n  ' + out.error + '\n'); } catch {} }
       return res.end();
+    }
+
+    /* Ввод ключа лаборатории.
+     *
+     * До сих пор подключиться из пульта было нечем: ключ читался только из
+     * переменной окружения, а о ней не было сказано ни на одном экране. Человек
+     * видел «лаборатория не подключена» и не имел ни одного способа это
+     * изменить — самая дорогая поломка из всех, потому что она выглядит как
+     * отсутствие возможности, а не как дефект.
+     *
+     * Ключ уходит в домашнюю папку с правами хозяина, а не в репозиторий, и
+     * обратно на экран не возвращается никогда: терминалы и вкладки попадают в
+     * скриншоты. Маршрут закрыт той же проверкой одного источника, что и все
+     * остальные, — страница, случайно открытая в браузере, сюда не достучится. */
+    if (req.method === 'POST' && url.pathname === '/api/lab/key') {
+      const body = await readBody(req);
+      const given = String((body as any).key || '').trim();
+      if (given === '') {
+        labForget();
+        return sendJSON(res, 200, { ok: true, connected: false });
+      }
+      try { labRemember(given); }
+      catch (e: any) { return sendJSON(res, 400, { error: String(e?.message || e) }); }
+      /* Проверяем связь, а не только форму ключа. «Сохранено» без ответа от
+       * лаборатории — то же самое обещание без проверки, от которого этот экран
+       * и лечится. */
+      const seen = await labView('projects', {});
+      if ((seen as any).error) {
+        labForget();
+        return sendJSON(res, 400, { error: 'The laboratory did not accept that key: ' + (seen as any).error });
+      }
+      const products = ((seen as any).projects || []).map((x: any) => x.id).filter(Boolean);
+      return sendJSON(res, 200, { ok: true, connected: true, products });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/lab') {
@@ -2755,6 +2789,18 @@ const HTML = /* html */ `<!doctype html>
 .lab-card ul{margin:0 0 16px 18px;padding:0;line-height:1.6}
 .lab-card li{margin-bottom:6px}
 .lab-go{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+/* Поле ключа отделено чертой: это второй путь, а не продолжение первого —
+ * «заведите учётную запись» и «у меня уже есть ключ» решают разные задачи. */
+.lab-key{margin-top:20px;padding-top:18px;border-top:1px solid var(--line,#dfe2e5)}
+.lab-key label{display:block;font-size:12.5px;color:var(--dim2,#62666d);margin-bottom:8px}
+.lab-key-row{display:flex;gap:8px;flex-wrap:wrap}
+.lab-key-row input{flex:1 1 260px;min-width:0;padding:8px 10px;font-family:var(--mono,ui-monospace,monospace);
+  font-size:13px;border:1px solid var(--line,#dfe2e5);border-radius:2px;background:var(--panel,#fff);
+  color:inherit}
+.lab-key-row input:focus{outline:2px solid var(--acc,#0f7b4f);outline-offset:1px}
+.lab-key-say{margin-top:9px;font-size:12.5px;min-height:1.2em}
+.lab-key-say.ok{color:var(--ok,#0f7b4f)}
+.lab-key-say.bad{color:var(--bad,#8a1f11)}
 .model-empty{color:var(--dim2); font-size:13px; line-height:1.65; padding:20px 0; max-width:80ch}
   .model-empty code{background:var(--panel2); padding:1px 6px; border-radius:5px; font-size:12px}
   .mermaid-wrap{overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px}

@@ -497,6 +497,143 @@ function check(arg) {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Лаборатория: ключ и подключение по MCP
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Подключить эту машину к лаборатории и прописать её ассистенту.
+ *
+ * До сих пор подключиться было нечем. Ключ читался только из переменной
+ * окружения, а сама переменная не упоминалась ни на одном экране и ни в одном
+ * документе: человек, скачавший клиент, видел «лаборатория не подключена» и не
+ * имел ни одного способа это изменить.
+ *
+ * Ключ сюда попадает один раз и ложится в домашнюю папку, а не в репозиторий:
+ * он даёт право читать модель продукта, а репозитории коммитят и показывают.
+ */
+async function labCmd(sub, flag) {
+  const L = await import(path.join(DIR, 'lib', 'lab.js'));
+
+  if (sub === 'forget') {
+    say(L.forget() ? 'Key removed. Everything that does not need a model keeps working.'
+                   : 'There was no saved key.');
+    return;
+  }
+
+  /* Ключ приходит либо аргументом, либо уже сохранён. Печатать его обратно на
+   * экран нельзя: терминалы попадают в скриншоты и в записи демонстраций. */
+  if (sub && sub !== 'add' && sub !== 'add-here' && sub !== 'status') {
+    try { const f = L.remember(sub); say(`Key saved in ${f}`); }
+    catch (e) { die(String(e.message || e)); }
+  }
+
+  const key = L.key();
+  if (!key) {
+    console.log('');
+    say(`${c('0;36', 'Not connected.')} The model of a product is built and kept in the laboratory.`);
+    console.log('');
+    say(`  1. Sign in at ${c('0;36', L.lab().signIn)}  (or sign up: ${L.lab().signUp})`);
+    say(`  2. Open ${c('0;36', L.lab().keys)} and copy your key`);
+    say(`  3. Run: ${c('0;36', 'gitmir lab ctx_your_key_here')}`);
+    console.log('');
+    say('Everything that does not need a model works without any of this:');
+    say('  the task queue, findings, and the audits that walk a running app.');
+    console.log('');
+    return;
+  }
+
+  /* Проверяем связь, а не только наличие ключа. «Ключ задан» и «лаборатория
+   * отвечает» — разные новости, и человек, только что вставивший ключ, хочет
+   * знать вторую. */
+  let products = [];
+  try {
+    const r = await L.view('projects', {});
+    if (r.error) die(`The laboratory answered: ${r.error}`);
+    products = (r.projects || []).map((x) => x.id).filter(Boolean);
+  } catch (e) {
+    die(`Could not reach the laboratory: ${String(e?.message || e)}`);
+  }
+  say(`${c('0;32', 'Connected.')} It can read: ${products.length ? products.join(', ') : '(nothing yet)'}`);
+
+  if (sub !== 'add' && sub !== 'add-here') {
+    console.log('');
+    say(`To let your assistant ask it directly: ${c('0;36', 'gitmir lab add')}`);
+    console.log('');
+    return;
+  }
+
+  /* Регистрация лаборатории у ассистента.
+   *
+   * По умолчанию — пользовательская область, и это не лень: в проектной ключ
+   * уехал бы в `.mcp.json` внутри репозитория, то есть в коммит. Одна
+   * регистрация обслуживает все проекты: у инструментов лаборатории есть
+   * аргумент проекта, и спрашивают они про тот, что назовут.
+   *
+   * `--here` оставлен для тех, кому нужна привязка к папке, и туда пишется не
+   * ключ, а ссылка на переменную окружения — секрет в репозиторий не попадает
+   * ни в каком случае. */
+  const here = sub === 'add-here';
+  const scope = here ? 'project' : 'user';
+  const header = here ? 'Authorization: Bearer ${GITMIR_LAB_KEY}' : `Authorization: Bearer ${key}`;
+  const args = ['mcp', 'add', '-s', scope, 'gitmir-lab', '--transport', 'http',
+                L.lab().mcp, '--header', header];
+  try {
+    console.log(runClaude(args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim());
+  } catch (e) {
+    const said = `${e.stdout || ''}${e.stderr || ''}`.trim();
+    if (e.code === 'ENOENT') {
+      console.log('');
+      say("The 'claude' CLI is not on your PATH. Register it by hand — this is the whole thing:");
+      console.log('');
+      console.log(`    claude mcp add -s ${scope} gitmir-lab --transport http ${L.lab().mcp} \\`);
+      console.log(`      --header "${header}"`);
+      console.log('');
+      return;
+    }
+    if (/already exists/i.test(said)) {
+      say(`${c('0;36', 'Already registered')} — gitmir-lab is in your ${scope} config.`);
+      say(`To replace it:  claude mcp remove -s ${scope} gitmir-lab && gitmir lab ${sub}`);
+      console.log('');
+      return;
+    }
+    die(`claude could not register it:\n    ${said.split('\n')[0] || String(e.message || e)}`);
+  }
+  console.log('');
+  if (here) {
+    say(`Written into .mcp.json in ${process.cwd()}`);
+    say(`${c('0;32', 'The key is not in that file')} — it reads GITMIR_LAB_KEY from the environment,`);
+    say('so the file is safe to commit.');
+    console.log('');
+    /* И сразу же — единственная ловушка этого пути.
+     *
+     * Незаданная переменная не ломает загрузку конфигурации: подставляется
+     * буквальная строка `${GITMIR_LAB_KEY}`, и она уезжает в заголовке как
+     * ключ. Лаборатория отвечает «неверный ключ», и человек идёт проверять
+     * ключ — тот самый, который у него верный. Сказать об этом надо здесь, а не
+     * оставить выяснять по симптому. */
+    if ((process.env.GITMIR_LAB_KEY || '').trim()) {
+      say(`${c('0;32', 'GITMIR_LAB_KEY is set in this shell')} — but your editor is a different one.`);
+    } else {
+      say(`${c('0;33', 'GITMIR_LAB_KEY is not set here.')} Until it is, the request goes out with the`);
+      say('placeholder instead of a key, and the laboratory answers "bad key" about a key you have.');
+    }
+    say('Put this where your editor will see it (your shell profile, or the editor\'s own env):');
+    console.log('');
+    console.log(`    export GITMIR_LAB_KEY=${key.slice(0, 8)}…`);
+    console.log('');
+    say(`Nothing to set up if you drop the ${c('0;36', '--here')}: ${c('0;36', 'gitmir lab add')} carries the key itself,`);
+    say('in your own config, outside every repository.');
+  } else {
+    say('Added for every project. Ask it about one by name — it knows:');
+    say(`  ${products.join(', ') || '(nothing yet)'}`);
+  }
+  console.log('');
+  say(`Your assistant now has both: ${c('0;36', 'gitmir')} for the queue and the audits,`);
+  say(`and ${c('0;36', 'gitmir-lab')} for what the product does.`);
+  console.log('');
+}
+
 async function doctor() {
   const has = (cmd) => {
     try { execFileSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' }); return true; }
@@ -521,9 +658,17 @@ async function doctor() {
   // The laboratory is half of what this tool does, and the first thing setup asks
   // for. Reading the environment is the whole test, deliberately: probing the
   // network here would make `gitmir status` sit on a timeout when offline.
-  row('laboratory', (process.env.GITMIR_LAB_KEY || '').trim()
-    ? 'GITMIR_LAB_KEY is set'
-    : c('1;33', 'no GITMIR_LAB_KEY — the model lives at lab.gitmir.com/account/access'));
+  /* Признак подключения — один на весь клиент, и берётся он там же, где его
+   * берут пульт и MCP-сервер. Своя копия этой проверки здесь смотрела только на
+   * переменную окружения и потому говорила «не подключено» человеку, который
+   * подключился командой минуту назад. */
+  {
+    const L = await import(path.join(DIR, 'lib', 'lab.js'));
+    const src = L.keySource();
+    row('laboratory', src === 'environment' ? 'connected (key from GITMIR_LAB_KEY)'
+      : src === 'saved' ? `connected (key saved in ${STATE})`
+      : c('1;33', 'not connected — run `gitmir lab` to connect'));
+  }
   row(`port ${PORT}`, (await listening()) ? 'serving' : 'not running');
   row('version', ver);
   row('runtime deps', deps);
@@ -547,6 +692,12 @@ const HELP = `
     gitmir mcp add      register it for every project (Claude Code CLI)
     gitmir mcp add-here pin it to this folder, in .mcp.json
     gitmir check [dir]  set a project up, and print what is still missing (writes)
+
+    gitmir lab          is a laboratory connected, and what can it read
+    gitmir lab <key>    save the key from lab.gitmir.com/account/access
+    gitmir lab add      let your assistant ask the laboratory directly
+    gitmir lab add-here pin that to this folder (.mcp.json, key kept out of it)
+    gitmir lab forget   remove the saved key
     gitmir log [n]      the last n lines the server printed
     gitmir path         where the checkout lives
 
@@ -562,6 +713,7 @@ switch (cmd) {
   case 'update': await update(); break;
   case 'mcp': mcp(arg, flag); break;
   case 'check': check(arg); break;
+  case 'lab': await labCmd(arg, flag); break;
   case 'path': console.log(DIR); break;
   case 'log':
     try { console.log(fs.readFileSync(LOG, 'utf8').split('\n').slice(-(Number(arg) || 40)).join('\n')); }

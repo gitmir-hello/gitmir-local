@@ -1061,7 +1061,49 @@ function labCard(d){
     + '<p class="lab-go">'
     +   '<a class="btn primary" href="'+esc(L.signUp||'https://lab.gitmir.com/signup')+'" target="_blank" rel="noopener">Open the laboratory</a> '
     +   '<a class="btn" href="'+esc(L.signIn||'https://lab.gitmir.com/login')+'" target="_blank" rel="noopener">I already have an account</a>'
-    + '</p></div>';
+    + '</p>'
+    /* Поле для ключа стоит здесь, а не в настройках.
+     *
+     * Это единственный экран, на котором человек узнаёт, что подключения нет, —
+     * и до сих пор он же был тупиком: рассказывал про лабораторию и не давал
+     * ничего сделать. Способ подключиться должен стоять там, где сказано, что
+     * подключения нет. */
+    + '<div class="lab-key">'
+    +   '<label for="labKey">Already have a key? Paste it — it is saved on this machine only.</label>'
+    +   '<div class="lab-key-row">'
+    +     '<input id="labKey" type="password" autocomplete="off" spellcheck="false" placeholder="ctx_…">'
+    +     '<button class="btn primary" id="labKeySave" type="button">Connect</button>'
+    +   '</div>'
+    +   '<div class="lab-key-say" id="labKeySay"></div>'
+    + '</div>'
+    + '</div>';
+}
+
+/* Подключение по ключу, введённому руками.
+ *
+ * Ключ уходит на свой же сервер и обратно не возвращается ни разу: поле
+ * очищается сразу, а ответ говорит только о том, что лаборатория приняла и что
+ * теперь видно. Ошибку показываем словами лаборатории — «ключ не подошёл»
+ * человек чинит иначе, чем «лаборатория не отвечает». */
+function wireLabKey(){
+  const btn=document.getElementById('labKeySave'); if(!btn) return;
+  const inp=document.getElementById('labKey'), say=document.getElementById('labKeySay');
+  const go=async()=>{
+    const v=(inp.value||'').trim(); if(!v) return;
+    btn.disabled=true; say.className='lab-key-say'; say.textContent='Asking the laboratory…';
+    try{
+      const r=await fetch('/api/lab/key',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({key:v})});
+      const d=await r.json();
+      inp.value='';
+      if(!r.ok||d.error){ say.className='lab-key-say bad'; say.textContent=d.error||'That did not work.'; btn.disabled=false; return; }
+      say.className='lab-key-say ok';
+      say.textContent='Connected. It can read: '+((d.products&&d.products.length)?d.products.join(', '):'nothing yet');
+      setTimeout(()=>{ if(typeof loadModel==='function') loadModel(selected); load(true); }, 700);
+    }catch(e){ say.className='lab-key-say bad'; say.textContent='Could not reach this dashboard.'; btn.disabled=false; }
+  };
+  btn.addEventListener('click', go);
+  inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter') go(); });
 }
 
 /* Карта областей — то, с чего смотрелка начинается.
@@ -1156,7 +1198,7 @@ async function loadModel(pathStr){
   let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(pathStr))).json(); }
   catch{ if(req===modelReq) view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
   if(req!==modelReq) return;
-  if(d && d.connected===false){ view.innerHTML=labCard(d); modelData=null; return; }
+  if(d && d.connected===false){ view.innerHTML=labCard(d); wireLabKey(); modelData=null; return; }
   if(d && d.error){ view.innerHTML='<div class="model-empty"><b>The laboratory could not answer.</b><br>'+esc(d.error)+'</div>'; modelData=null; return; }
   modelData=d; modelFor=pathStr;
   drawMap(view, d);
