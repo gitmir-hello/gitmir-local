@@ -36,7 +36,7 @@ who runs it once and then opens their editor in a project finds nothing there an
 reasonably concludes it did not work. At user scope the server is available everywhere and
 answers about whichever folder the editor was opened in.
 
-All twelve skills arrive with it, as prompts — most clients surface those as slash
+All eight skills arrive with it, as prompts — most clients surface those as slash
 commands — and as tools the agent can call on its own. Nothing is pasted.
 
 Point another MCP client at `mcp.ts` in this repository instead:
@@ -224,5 +224,5 @@ the only thing any tool touches is this machine's own `.gitmir/` and `tasks/` fo
   text. The consumer here is a model reading prose, and the arithmetic it needs is in
   the prose already; a second serialization would double the payload to serve client
   code that does not exist yet.
-- **No pagination cursors.** Fifteen tools and twelve prompts fit in one response. A
+- **No pagination cursors.** Eleven tools and eight prompts fit in one response. A
   `cursor` is accepted and ignored rather than rejected, so a paginating client works.

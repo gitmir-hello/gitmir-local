@@ -253,7 +253,7 @@ function codexConfig(project) {
  *
  * Written as one place rather than three `if`s, because the two clients differ in
  * more than a binary name: what registers them, where that lands, whether a project
- * can be pinned, and — the part people get bitten by — whether the twelve skills
+ * can be pinned, and — the part people get bitten by — whether the eight skills
  * arrive as slash commands or only as tools. */
 function agent(which) {
   if (which === 'codex') {
@@ -320,7 +320,7 @@ function mcpCodex(sub) {
   say(`${c('1;37', 'Restart Codex')} — a client reads its MCP config once, at startup.`);
   say(`Then say: ${c('0;36', 'set this project up with GitMir')}`);
   // The one real functional difference. Promising slash commands here would be a lie.
-  say('Codex does not implement MCP prompts, so the twelve skills arrive as tools rather than');
+  say('Codex does not implement MCP prompts, so the eight skills arrive as tools rather than');
   say(`slash commands — the agent reaches them with ${c('0;36', 'gitmir_skills')} and ${c('0;36', 'gitmir_skill')}.`);
   say('Nothing is lost: the server says so in its own instructions at startup.');
   console.log('');
@@ -389,7 +389,7 @@ function mcp(sub, flag) {
     console.log('');
     say(`${c('1;37', 'Restart your editor')} — a client reads its MCP config once, at startup.`);
     say(`Then say: ${c('0;36', 'set this project up with GitMir')}`);
-    say(`All twelve skills arrive as slash commands; nothing has to be pasted.`);
+    say(`All eight skills arrive as slash commands; nothing has to be pasted.`);
     console.log('');
     return;
   }

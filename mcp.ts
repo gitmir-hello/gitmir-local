@@ -99,29 +99,15 @@ const READS: ToolAnnotations = {
   readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false,
 };
 
-// ---------- how big is this source ----------
-const SOURCE_EXT = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.rb', '.go', '.rs', '.java', '.kt',
-  '.swift', '.php', '.cs', '.scala', '.ex', '.exs', '.sql', '.vue', '.svelte', '.c', '.h',
-  '.cc', '.cpp', '.hpp', '.m', '.mm', '.proto', '.graphql',
-]);
-// Vendored, generated and our own artefacts. Counting them would answer a different
-// question than the one being asked: how much of the product is there to read.
-const SKIP_DIR = new Set([
-  'node_modules', '.git', 'dist', 'build', 'out', 'target', 'vendor', 'bower_components',
-  '.next', '.nuxt', '.svelte-kit', 'coverage', '__pycache__', '.venv', 'venv', '.tox',
-  '.gradle', '.idea', '.vscode', '.cache', '.gitmir', 'tasks',
-]);
-const CENSUS_CAP = 60000;                  // past this the answer is already "too big to read at once"
-
-type Census = { files: number; bytes: number; capped: boolean };
-
-// Where one pass stops being safe. Both are heuristics, and they are deliberately
-// cautious in one direction only: recommending the staged route for a source that
-// would have fitted costs some extra tasks, while the other mistake costs a model
-// that reads as finished and is not.
-const ONE_PASS_BYTES = 1_500_000;
-const ONE_PASS_FILES = 250;
+/* Замер исходника отсюда убран вместе с локальной сборкой.
+ *
+ * Он считал, влезает ли репозиторий в один проход, и если нет — предлагал ввод
+ * по частям. И то и другое имело смысл, пока модель строилась на этой машине.
+ * Она строится в лаборатории, и решение «в один проход или по частям» принимают
+ * там, где читают. Здесь оставались только константы и тип: ни одна строка их не
+ * звала, а описание инструмента и инструкция агенту продолжали обещать и замер,
+ * и поэтапный ввод. Обещание, которого код не выполняет, дороже отсутствующей
+ * возможности: агент идёт делать то, чего ему не дадут. */
 
 function todoCount(project: string): number {
   try { return fs.readdirSync(path.join(project, 'tasks', 'todo')).filter((f) => f.endsWith('.md')).length; }
@@ -178,13 +164,12 @@ const TOOLS: Tool[] = [
     title: 'Set this project up for GitMir',
     description:
       'Prepare a project to be worked on with GitMir: put it on the dashboard, create the task ' +
-      'queue folders, and report what is still missing — above all whether the product model ' +
-      'exists. Call this the first time you touch a project, or whenever another tool answers ' +
-      '"there is no model here". When the model is missing it also measures the source and ' +
-      'returns the right procedure IN FULL — for a repository too big to read in one pass that ' +
-      'is the staged ingest, which writes one task per fragment into tasks/todo — so you can ' +
-      'start straight away without fetching anything else. If an ingest is already under way it ' +
-      'reports where it stopped instead. Creates only folders and a list entry; it never edits code.',
+      'queue folders, and say what is still missing — above all whether this machine is ' +
+      'connected to the laboratory, which is where the model of a product is built and kept. ' +
+      'Call this the first time you touch a project, or whenever another tool answers "there ' +
+      'is no model here". It also lists what works with no laboratory account at all: the task ' +
+      'queue, findings, and the audits that walk a running application. Creates only folders ' +
+      'and a list entry; it never edits code.',
     inputSchema: { type: 'object', properties: { ...PROJECT_ARG }, required: [] },
     async run(_args: Record<string, unknown>, project: string) {
       const lines: string[] = [];
@@ -250,8 +235,8 @@ const TOOLS: Tool[] = [
       const out = ['GitMir skills. Fetch one with gitmir_skill("<name>") and follow it.', ''];
       for (const d of defs) out.push(`${d.name}\n    ${d.description}`);
       out.push('');
-      out.push('No model yet? Call gitmir_setup first — it measures the source and hands you the right one');
-      out.push('that does not. Nothing else here works until the model exists.');
+      out.push('No model yet? Call gitmir_setup — it says what is missing, and which of these');
+      out.push('procedures work without one. The model itself is built in the laboratory.');
       return { text: out.join('\n') };
     },
   },
@@ -760,12 +745,9 @@ async function handle(msg: any): Promise<void> {
           'depends on it, what a change would reach, and how risky it is. Every answer states how ' +
           'fresh the model is; if it says STALE, say so rather than presenting it as current. ' +
           'If a tool answers that there is no model here, call gitmir_setup: it puts the project on ' +
-          'the dashboard, makes the task queue, and tells you what is missing. On a project with no ' +
-          'model it also measures the source and returns the procedure to follow, in full — and on a ' +
-          'repository too big to read in one pass that procedure is the staged ingest: carve the source ' +
-          'into fragments and write one task per fragment into tasks/todo, then work them through the ' +
-          'queue. Do that rather than reading a large repository file by file; a model read in one pass ' +
-          'from a source that did not fit comes out plausible, shallow and partly invented. The written procedures ' +
+          'the dashboard, makes the task queue, and tells you what is missing. The model itself is ' +
+          'built and kept in the laboratory, not on this machine — so "no model here" is answered by ' +
+          'connecting to it, not by reading the repository file by file and writing one down. The written procedures ' +
           'are gitmir_skills and gitmir_skill — fetch one and follow it yourself rather than asking ' +
           'the user to paste anything. ' +
           // Two procedures answer a request rather than a question, and an agent walks

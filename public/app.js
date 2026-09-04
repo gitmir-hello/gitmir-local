@@ -520,7 +520,7 @@ const SKILL_GROUPS = [
     items:{ 'legacy-maintenance':'branch', 'stack-port':'external' } },
 ];
 
-// Which skill this project actually needs next, from /api/overview. Twelve cards
+// Which skill this project actually needs next, from /api/overview. Eight cards
 // shown at once is an inventory; a person needs the one that fits where they are.
 let nextStep = null, nextStepFor = null, showAllSkills = false;
 async function loadNextStep(pathStr){
@@ -572,7 +572,7 @@ function renderSkillButtons(){
       w.appendChild(skillCard(step, nextStep.why, 'Then'));
     }
     const all=document.createElement('button'); all.className='sk-all'; all.type='button';
-    all.textContent='All twelve skills →';
+    all.textContent='All eight skills →';
     all.addEventListener('click', ()=>{ showAllSkills=true; renderSkillButtons(); });
     w.appendChild(all);
     box.appendChild(w);
@@ -711,8 +711,8 @@ function viewHead(key){
   '</div>';
 }
 
-// One subject at a time. Twelve journeys stacked down a 17,000-pixel page is a
-// shop window: nothing can be compared, nothing can be found, and twelve canvases
+// One subject at a time. Eight journeys stacked down a tall page is a
+// shop window: nothing can be compared, nothing can be found, and eight canvases
 // animate at once. Pick one.
 function subjectPicker(items, currentId, onPick){
   const box=document.createElement('div'); box.className='ent-picker';
@@ -743,7 +743,7 @@ async function loadFindings(pathStr){
 const findingsOnId = (id)=> (findingsData.findings||[]).filter(f=>(f.touches||[]).includes(id));
 let modelFor=null;   // which project modelData belongs to
 let modelView = 'map';
-let journeyPick = null;   // one journey on screen at a time, not all twelve
+let journeyPick = null;   // one journey on screen at a time, not all eight
 let decisionPick = null;
 // Every view switch bumps this. Laying a diagram out is async, so without it a slow
 // view keeps appending into the pane after someone has already moved to another one —
@@ -952,7 +952,7 @@ function renderMcpBox(){
 
   // WHICH AGENT. Two clients, and the difference is not cosmetic: Codex has no
   // scope flag, so the registration has to name the project, and it does not
-  // implement MCP prompts, so the twelve skills arrive as tools rather than slash
+  // implement MCP prompts, so the eight skills arrive as tools rather than slash
   // commands. Printing Claude's instructions to a Codex user would be wrong on
   // both counts, and they would find out the slow way.
   const agents = window.__GITMIR_AGENTS__ || {};
@@ -1058,12 +1058,12 @@ function renderMcpBox(){
     step(3,
       'Say: <i>set this project up with GitMir</i>',
       (isCodex
-        ? 'All twelve procedures arrive with the server as <b>tools</b> — Codex does not implement MCP prompts, so '+
+        ? 'All eight procedures arrive with the server as <b>tools</b> — Codex does not implement MCP prompts, so '+
           'they are not slash commands there. Nothing is lost and nothing is pasted: the agent lists them with '+
           '<code>gitmir_skills</code> and fetches one with <code>gitmir_skill</code>, and the server says so in its '+
           'own instructions at startup. This one adds the folder to this dashboard, creates the task queue, and says '+
           'what is still missing, including the model if there is none yet.'
-        : 'All twelve procedures arrive with the server — as slash commands, and as tools the agent can call on its own. '+
+        : 'All eight procedures arrive with the server — as slash commands, and as tools the agent can call on its own. '+
           'Nothing is pasted. This one adds the folder to this dashboard, creates the task queue, and says what is still '+
           'missing, including the model if there is none yet.'),
       '', '',
@@ -3165,7 +3165,7 @@ function renderSteps(view, pathStr, d){
       +  '<div class="st-do-c three wait"><div class="num">3</div>'
       +    '<h5>We notice by ourselves</h5>'
       +    '<p>As soon as your assistant asks us anything, this page moves on. You do not have to tell us.'
-      +    (codexNow ? ' Codex has no MCP prompts, so the twelve skills arrive as tools rather than slash '
+      +    (codexNow ? ' Codex has no MCP prompts, so the eight skills arrive as tools rather than slash '
                      + 'commands — ask it to list them, or let it call <code>gitmir_skills</code> itself.' : '')+'</p>'
       +    '<div class="act"><div class="st-wait"><i class="st-dot"></i>Listening…</div></div></div>'
       +  '</div>'
