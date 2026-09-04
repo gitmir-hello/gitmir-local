@@ -411,7 +411,14 @@ function check(arg) {
   say(`Asking the server about ${project}`);
   console.log('');
   try {
-    execFileSync(process.execPath, ['mcp-check.ts', project, 'model'], { cwd: DIR, stdio: 'inherit' });
+    /* Спрашиваем `setup`, а не модель.
+     *
+     * Модели здесь нет и не будет — она живёт в лаборатории, — а команда
+     * продолжала спрашивать именно её и печатала «Unknown tool». Первое, что
+     * делает человек, проверяя установку, — эта команда; она обязана отвечать
+     * тем, что установка правда умеет, а `setup` к тому же и говорит, чего ей
+     * не хватает. */
+    execFileSync(process.execPath, ['mcp-check.ts', project, 'setup'], { cwd: DIR, stdio: 'inherit' });
   } catch {
     die('The check did not run. `gitmir status` will say whether Node is new enough.');
   }

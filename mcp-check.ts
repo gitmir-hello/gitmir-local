@@ -33,17 +33,16 @@ examples/refund-shop, which ships with this repository.
   setup             prepare a project: dashboard entry, task queue, what is missing
   skills            the written procedures and when to use one
   skill <name>      one procedure in full
-  model [dimension] what is this product
-  nav <id>          what is this object, and what breaks if it changes
-  impact <what>     what a change reaches: ids separated by commas, OR a task file name
+
+  Ничего про саму модель здесь нет и быть не может: она живёт в лаборатории,
+  и спрашивают её тем же протоколом, но по её адресу. Раньше эти команды тут
+  оставались и печатали «Unknown tool» — то есть первое, что делал человек,
+  проверяя исправную установку, была ошибка.
   queue             the planned work
   flag              record a finding (writes into the project)
   findings          where the code disagrees with the product
   attention         what needs a person, worked out from the model
-  design            what the product should become, and how much of it exists
   accept <id>       record a decision to live with one
-  history           how the product changed over the last 30 days
-  versions          every version of the model this project has
   new <title>       write a task (with proper verify steps)
   newbad <title>    try to write a task with NO verify steps — the server must refuse
   approve <column> <file>     approve a task
@@ -197,11 +196,12 @@ switch (cmd) {
   case 'setup':  head('Setting the project up');    show(await call('gitmir_setup', {})); break;
   case 'skills': head('The procedures on offer');   show(await call('gitmir_skills', {})); break;
   case 'skill':  head('Procedure: ' + arg);         show(await call('gitmir_skill', { name: arg })); break;
-  case 'model':  head('The product model');        show(await call('gitmir_model', arg ? { dimension: arg } : {})); break;
-  case 'nav':    head('Object: ' + arg);           show(await call('gitmir_navigate', { id: arg })); break;
-  case 'impact': head('What it would reach: ' + arg);
-    show(await call('gitmir_impact', arg.endsWith('.md') ? { task: arg } : { ids: arg.split(/[,\s]+/).filter(Boolean) }));
-    break;
+  /* Три вопроса про саму модель отсюда убраны: инструментов под ними больше нет.
+   *
+   * Модель живёт в лаборатории, и спрашивают её там — тем же протоколом, но по
+   * другому адресу. Здесь они оставались командами, которые честно печатали
+   * «Unknown tool», и первое, что делал человек, проверяя установку, — получал
+   * ошибку от исправной установки. */
   case 'queue':    head('The queue');                       show(await call('gitmir_queue', {})); break;
   case 'flag':     head('Recording a finding');
     show(await call('gitmir_flag', {
@@ -213,11 +213,8 @@ switch (cmd) {
     })); break;
   case 'findings': head('Where the code disagrees with the product'); show(await call('gitmir_findings', { status: arg || 'open' })); break;
   case 'attention': head('What needs a person');                    show(await call('gitmir_attention', {})); break;
-  case 'design':    head('What the product should become');          show(await call('gitmir_design', {})); break;
   case 'accept':   head('Deciding to live with one');
     show(await call('gitmir_accept_finding', { id: argv[2], status: 'accepted', by: 'mcp-check', why: 'Proving the decision path records a name and a reason.' })); break;
-  case 'history':  head('How the product changed');           show(await call('gitmir_history', arg ? { days: Number(arg) } : {})); break;
-  case 'versions': head('Versions of the model');             show(await call('gitmir_history', { list: true })); break;
   case 'new':      head('Writing a task: ' + arg);          show(await call('gitmir_create_task', GOOD(arg))); break;
   case 'newbad':   head('A task with no checks (expect a refusal)'); show(await call('gitmir_create_task', BAD(arg))); break;
   case 'approve':  head('Approving');                       show(await call('gitmir_approve', { column: argv[2], file: argv[3] })); break;

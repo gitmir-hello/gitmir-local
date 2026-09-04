@@ -1099,7 +1099,36 @@ const server = http.createServer(async (req, res) => {
       if (!labConnected()) return sendJSON(res, 200, needsLab('The model of this product'));
       /* Карта областей — то, с чего начинается смотрелка. Она приходит проекцией:
        * имена, деловые слова, ручки. Ни идентификатора, ни устройства. */
-      const which = url.searchParams.get('project') || '';
+      /* Пульт знает путь на диске, лаборатория — имя продукта. Это разные вещи.
+       *
+       * Здесь стояло чтение `project`, а пульт всё это время слал `path`, — и
+       * смотрелка была мертва целиком: карта запрашивалась без имени продукта и
+       * приходила пустой. Связка нужна настоящая, а не переименование параметра:
+       * по имени папки ищем продукт среди тех, что лаборатория за этим ключом
+       * показывает. Не нашли — говорим прямо и перечисляем, что у неё есть.
+       * Молча показать чужой продукт было бы хуже пустого экрана. */
+      const asked = url.searchParams.get('project') || '';
+      const local = url.searchParams.get('path') || '';
+      let which = asked;
+      if (!which && local) {
+        const mine = await labView('projects', {});
+        const list: string[] = ((mine as any).projects || []).map((x: any) => x.id).filter(Boolean);
+        const base = local.replace(/\/+$/, '').split('/').pop() || '';
+        const norm = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+        which = list.find((id) => norm(id) === norm(base))
+             || list.find((id) => norm(base).includes(norm(id)) || norm(id).includes(norm(base)))
+             || '';
+        if (!which) {
+          return sendJSON(res, 200, {
+            exists: false, connected: true, lab: lab(),
+            error: list.length
+              ? 'The laboratory has no product under this folder\u2019s name. It knows: ' + list.join(', ')
+                + '. Connect this repository there, or open one of those.'
+              : 'This key can read no products yet. Connect a repository in the laboratory first.',
+            products: list,
+          });
+        }
+      }
       const area = url.searchParams.get('area') || '';
       const subject = url.searchParams.get('subject') || '';
       const out = subject ? await labView('neighbours', { project: which, subject })

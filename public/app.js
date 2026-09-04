@@ -557,31 +557,31 @@ function renderSkillButtons(){
   // it behind a suggestion means the one thing somebody came here to do is the
   // one thing they cannot find. The derived next step sits under it, when it is
   // something else.
-  const byNameAll = {}; for(const s of SKILLS) byNameAll[s.name]=s;
-  const builder = null;
-  const step = nextStep && byNameAll[nextStep.name] ? byNameAll[nextStep.name] : null;
-  const stepIsBuilder = !step || step.name===builder.name;
-
-  if(builder && !showAllSkills){
+  /* Здесь стояла ветка «сначала показать сборщик модели, потом остальное».
+   *
+   * Сборщика больше нет: модель строится в лаборатории, и переменная под него
+   * осталась пустой. Ветка от этого стала недостижимой, а строка, вычислявшая
+   * «этот шаг и есть сборщик», продолжала читать поле у пустого значения — и
+   * роняла отрисовку панели, как только появлялся следующий шаг. Первый показ
+   * проходил, второй оставлял пустое место: кнопок «скопировать процедуру»
+   * больше не было, и понять почему было нечем.
+   *
+   * Ветка убрана целиком. Ниже процедуры и так раскладываются по группам. */
+  const byName_ = {}; for(const s of SKILLS) byName_[s.name]=s;
+  const step = nextStep && byName_[nextStep.name] ? byName_[nextStep.name] : null;
+  if(step && !showAllSkills){
     const w=document.createElement('div'); w.className='sk-next';
-    w.appendChild(skillCard(builder,
-      stepIsBuilder && nextStep ? nextStep.why
-        : 'Reads this repository in the laboratory and works out what the product does. Ask it again whenever the code moves on.',
-      'Start here'));
-    if(!stepIsBuilder){
-      w.appendChild(skillCard(step, nextStep.why, 'Then'));
-    }
+    w.appendChild(skillCard(step, nextStep.why, 'Start here'));
     const all=document.createElement('button'); all.className='sk-all'; all.type='button';
-    all.textContent='All eight skills →';
+    all.textContent='All eight skills \u2192';
     all.addEventListener('click', ()=>{ showAllSkills=true; renderSkillButtons(); });
     w.appendChild(all);
     box.appendChild(w);
     return;
   }
-  if(builder && showAllSkills){
-
+  if(step && showAllSkills){
     const back=document.createElement('button'); back.className='sk-all back'; back.type='button';
-    back.textContent='← Just the next step';
+    back.textContent='\u2190 Just the next step';
     back.addEventListener('click', ()=>{ showAllSkills=false; renderSkillButtons(); });
     box.appendChild(back);
   }
@@ -1415,7 +1415,13 @@ async function renderHome(pathStr){
   if(!o || !o.ok){ view.innerHTML='<div class="model-empty">Could not read this project.</div>'; return; }
 
   const s=o.usage.summary, C=o.caught;
-  const objects=Object.values(o.model.counts||{}).reduce((a,b)=>a+b,0);
+  /* Модель здесь может отсутствовать — и обычно отсутствует.
+   *
+   * Она живёт в лаборатории, и сервер честно отдаёт `model: null`. Строка ниже
+   * читала поле у этого `null` и роняла отрисовку целиком: экран навсегда
+   * оставался на «Reading the project…», ничего не сообщив. Отсутствие модели —
+   * обычное состояние, а не сбой, и рисовать надо и его. */
+  const objects=Object.values((o.model&&o.model.counts)||{}).reduce((a,b)=>a+b,0);
 
   let h='<div class="hm">';
   h+='<div class="hm-top"><div class="hm-name">'+esc(p.name||pathStr.split('/').pop())+'</div>'+
