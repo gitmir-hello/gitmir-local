@@ -475,7 +475,7 @@ function mcp(sub, flag) {
  * whether anything works. This is the same call with the paths filled in.
  *
  * It asks for `setup` rather than for the model: the model is not on this machine
- * and never will be — it lives in the laboratory — so asking for it printed
+ * and never will be — it lives in Intelligence — so asking for it printed
  * "Unknown tool" at the very person checking a working install. `setup` answers
  * with what the install can actually do, and names what it is still missing.
  *
@@ -498,15 +498,15 @@ function check(arg) {
 }
 
 /* ---------------------------------------------------------------------------
- * Лаборатория: ключ и подключение по MCP
+ * Intelligence: ключ и подключение по MCP
  * ------------------------------------------------------------------------ */
 
 /**
- * Подключить эту машину к лаборатории и прописать её ассистенту.
+ * Подключить эту машину к Intelligence и прописать его ассистенту.
  *
  * До сих пор подключиться было нечем. Ключ читался только из переменной
  * окружения, а сама переменная не упоминалась ни на одном экране и ни в одном
- * документе: человек, скачавший клиент, видел «лаборатория не подключена» и не
+ * документе: человек, скачавший клиент, видел «Intelligence не подключён» и не
  * имел ни одного способа это изменить.
  *
  * Ключ сюда попадает один раз и ложится в домашнюю папку, а не в репозиторий:
@@ -531,7 +531,7 @@ async function labCmd(sub, flag) {
   const key = L.key();
   if (!key) {
     console.log('');
-    say(`${c('0;36', 'Not connected.')} The model of a product is built and kept in the laboratory.`);
+    say(`${c('0;36', 'Not connected.')} The model of a product is built and kept in Intelligence.`);
     console.log('');
     say(`  1. Sign in at ${c('0;36', L.lab().signIn)}  (or sign up: ${L.lab().signUp})`);
     say(`  2. Open ${c('0;36', L.lab().keys)} and copy your key`);
@@ -543,16 +543,16 @@ async function labCmd(sub, flag) {
     return;
   }
 
-  /* Проверяем связь, а не только наличие ключа. «Ключ задан» и «лаборатория
+  /* Проверяем связь, а не только наличие ключа. «Ключ задан» и «Intelligence
    * отвечает» — разные новости, и человек, только что вставивший ключ, хочет
    * знать вторую. */
   let products = [];
   try {
     const r = await L.view('projects', {});
-    if (r.error) die(`The laboratory answered: ${r.error}`);
+    if (r.error) die(`Intelligence answered: ${r.error}`);
     products = (r.projects || []).map((x) => x.id).filter(Boolean);
   } catch (e) {
-    die(`Could not reach the laboratory: ${String(e?.message || e)}`);
+    die(`Could not reach Intelligence: ${String(e?.message || e)}`);
   }
   say(`${c('0;32', 'Connected.')} It can read: ${products.length ? products.join(', ') : '(nothing yet)'}`);
 
@@ -563,11 +563,11 @@ async function labCmd(sub, flag) {
     return;
   }
 
-  /* Регистрация лаборатории у ассистента.
+  /* Регистрация Intelligence у ассистента.
    *
    * По умолчанию — пользовательская область, и это не лень: в проектной ключ
    * уехал бы в `.mcp.json` внутри репозитория, то есть в коммит. Одна
-   * регистрация обслуживает все проекты: у инструментов лаборатории есть
+   * регистрация обслуживает все проекты: у инструментов Intelligence есть
    * аргумент проекта, и спрашивают они про тот, что назовут.
    *
    * `--here` оставлен для тех, кому нужна привязка к папке, и туда пишется не
@@ -609,14 +609,14 @@ async function labCmd(sub, flag) {
      *
      * Незаданная переменная не ломает загрузку конфигурации: подставляется
      * буквальная строка `${GITMIR_LAB_KEY}`, и она уезжает в заголовке как
-     * ключ. Лаборатория отвечает «неверный ключ», и человек идёт проверять
+     * ключ. Intelligence отвечает «неверный ключ», и человек идёт проверять
      * ключ — тот самый, который у него верный. Сказать об этом надо здесь, а не
      * оставить выяснять по симптому. */
     if ((process.env.GITMIR_LAB_KEY || '').trim()) {
       say(`${c('0;32', 'GITMIR_LAB_KEY is set in this shell')} — but your editor is a different one.`);
     } else {
       say(`${c('0;33', 'GITMIR_LAB_KEY is not set here.')} Until it is, the request goes out with the`);
-      say('placeholder instead of a key, and the laboratory answers "bad key" about a key you have.');
+      say('placeholder instead of a key, and Intelligence answers "bad key" about a key you have.');
     }
     say('Put this where your editor will see it (your shell profile, or the editor\'s own env):');
     console.log('');
@@ -655,7 +655,7 @@ async function doctor() {
   row('claude CLI', has('claude') ? 'on PATH' : c('1;33', 'not found — needed only to run Claude Code from here'));
   const codex = codexBin();
   row('codex CLI', codex ? (codex === 'codex' ? 'on PATH' : codex) : c('1;33', 'not found — needed only to run Codex from here'));
-  // The laboratory is half of what this tool does, and the first thing setup asks
+  // Intelligence is half of what this tool does, and the first thing setup asks
   // for. Reading the environment is the whole test, deliberately: probing the
   // network here would make `gitmir status` sit on a timeout when offline.
   /* Признак подключения — один на весь клиент, и берётся он там же, где его
@@ -665,7 +665,7 @@ async function doctor() {
   {
     const L = await import(path.join(DIR, 'lib', 'lab.js'));
     const src = L.keySource();
-    row('laboratory', src === 'environment' ? 'connected (key from GITMIR_LAB_KEY)'
+    row('Intelligence', src === 'environment' ? 'connected (key from GITMIR_LAB_KEY)'
       : src === 'saved' ? `connected (key saved in ${STATE})`
       : c('1;33', 'not connected — run `gitmir lab` to connect'));
   }
@@ -686,16 +686,16 @@ const HELP = `
     gitmir              start it and open the browser
     gitmir stop         stop the server
     gitmir restart      stop, then start
-    gitmir status       node, agents, laboratory, port, version
+    gitmir status       node, agents, Intelligence, port, version
     gitmir update       git pull, and restart if it was running
     gitmir mcp          the MCP config for your editor
     gitmir mcp add      register it for every project (Claude Code CLI)
     gitmir mcp add-here pin it to this folder, in .mcp.json
     gitmir check [dir]  set a project up, and print what is still missing (writes)
 
-    gitmir lab          is a laboratory connected, and what can it read
+    gitmir lab          is Intelligence connected, and what can it read
     gitmir lab <key>    save the key from lab.gitmir.com/account/access
-    gitmir lab add      let your assistant ask the laboratory directly
+    gitmir lab add      let your assistant ask Intelligence directly
     gitmir lab add-here pin that to this folder (.mcp.json, key kept out of it)
     gitmir lab forget   remove the saved key
     gitmir log [n]      the last n lines the server printed

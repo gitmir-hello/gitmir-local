@@ -38,7 +38,7 @@ first** (files are named with a sortable number prefix), and keep going:
 3. **Claim.** Take the OLDEST file in `tasks/todo/` and **move** (rename) it into
    `tasks/inprogress/` before you start, so the dashboard shows it as active.
 4. **Do it.** Read the file — it carries the model context and what to do. Follow it
-   exactly. If a laboratory is connected, treat its answers about the product as the
+   exactly. If Intelligence is connected, treat its answers about the product as the
    source of truth, and ask it to re-read the repository after any code change.
 5. **Hand off to verification.** Append a short `## Outcome` (what changed, files
    touched) and **move the file to `tasks/verify/`**. Never to `tasks/done/`. If the
@@ -46,7 +46,7 @@ first** (files are named with a sortable number prefix), and keep going:
    that line is what the impact view reads, and a wrong one is worse than none.
 6. **Record what you touched.** When writing the task into `.claude/tasks.json`
    (task-log), fill `touched` with the handles of the things you changed — `gm_` and
-   ten characters, as the laboratory issued them. Never write a handle you did not
+   ten characters, as Intelligence issued them. Never write a handle you did not
    get from it.
 7. **Count what is left, out loud**, in one line — nothing more:
 
@@ -120,11 +120,11 @@ Rules while verifying:
 - If a step cannot run at all (no test runner, service won't start), say so plainly
   as `BLOCKED: <reason>` — do not silently skip it.
 
-**The description is one of the checks.** If a laboratory is connected and this task
+**The description is one of the checks.** If Intelligence is connected and this task
 changed code, verify that too, as its own line in `## Verification`: does the model still
 describe what the code now does — the entity, field, function, route, screen, event or
 status flow you touched? If it does not, that is a FAILED step like any other. Fix it by
-asking the laboratory to re-read the repository, and record that you did. A description
+asking Intelligence to re-read the repository, and record that you did. A description
 that lags the code is worse than none: it reads as authoritative and quietly misleads
 every session after this one.
 

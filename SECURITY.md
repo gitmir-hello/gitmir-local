@@ -1,8 +1,8 @@
 # Security & privacy
 
-**Short version:** with no laboratory key set, this tool opens no outbound
+**Short version:** with no Intelligence key set, this tool opens no outbound
 connection of its own — none, to anybody. Set `GITMIR_LAB_KEY` and one thing
-changes: questions about your product go to the laboratory, and answers come
+changes: questions about your product go to Intelligence, and answers come
 back.
 
 **Your source code is not in either direction, on any path, at any setting.**
@@ -33,10 +33,10 @@ setting a key, typing a URL, pressing a button, entering a workspace key.
    `http://localhost:<port>/api/add`), and writes the list itself when nothing
    answers.
 
-**Only if you have connected a laboratory** — that is, only if `GITMIR_LAB_KEY`
+**Only if you have connected Intelligence** — that is, only if `GITMIR_LAB_KEY`
 is set in the environment the tool starts in:
 
-2. **The laboratory — questions out, answers back.** `lib/lab.js` reads a
+2. **Intelligence — questions out, answers back.** `lib/lab.js` reads a
    projection for the viewer (`GET https://lab.gitmir.com/view/...`) and asks
    questions over MCP (`POST https://lab.gitmir.com/mcp`), both with your key as
    a bearer token. What goes out is the question: handles, names, the business
@@ -46,13 +46,13 @@ is set in the environment the tool starts in:
    deliberately does not probe the network — so an unset key opens no socket even
    to find out.
 3. **The connector, if you fetch one.** `lib/connector.js` downloads an
-   executable from the laboratory and runs it here. It exists precisely for
+   executable from Intelligence and runs it here. It exists precisely for
    source that may not leave the building: it reads the repository on this
    machine and sends the reading, not the repository. The download is checked
-   against the SHA-256 the laboratory names separately and is discarded if it
-   does not match, and your key is sent only to the laboratory's own origin —
-   if the laboratory points the download anywhere else, nothing is fetched and
-   the key is not sent there.
+   against the SHA-256 Intelligence names separately and is discarded if it
+   does not match, and your key is sent only to the origin Intelligence itself
+   is served from — if it points the download anywhere else, nothing is fetched
+   and the key is not sent there.
 
 **Only when you press the button**
 
@@ -147,7 +147,7 @@ You do not have to trust this page. Four independent ways to confirm it:
   text, yours to read, edit and commit.
 - **What every MCP answer cost:** `.gitmir/usage.jsonl` inside your projects.
 - **Skills:** `skills/*.md` in this folder — plain text you can read and edit.
-- **What the product does:** not here. It is built and kept by the laboratory and
+- **What the product does:** not here. It is built and kept by Intelligence and
   reached over MCP. Nothing about it is written to this machine.
 
 ## Team bridge (optional, opt-in)
@@ -169,7 +169,7 @@ rule as everything else here: **the relay routes, it does not store.**
   `relay-client.mjs`): nothing a peer sends can write a file describing your
   product onto your disk, and nothing you do here can hand a copy of yours to a
   teammate. A copy of a product cannot be recalled once it is on somebody's
-  laptop; who may see a model is decided by the laboratory, against a key that
+  laptop; who may see a model is decided by Intelligence, against a key that
   can be taken back.
 - **Source code is never uploaded, at any level.** Not behind a flag, not as an
   attachment. No code path here sends file contents from your repository, and no

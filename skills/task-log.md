@@ -58,9 +58,9 @@ Fields:
     precise enough).
   - `detail`, `files` — where you can, optional.
   - `touched` — the handles of the things the task **changed** (not the ones it
-    read), copied exactly as the laboratory issued them: `gm_` and ten characters.
+    read), copied exactly as Intelligence issued them: `gm_` and ten characters.
     This field is what the product's own history is built from: what changed, when,
-    and in which area. If no laboratory is connected, leave the field out — an
+    and in which area. If Intelligence is not connected, leave the field out — an
     invented handle points at nothing, and a history of those is worse than none.
 
 The file must always remain valid JSON.

@@ -17,15 +17,15 @@ Your repository holds the code. Nobody holds **how the product actually works** 
 in several heads, in a wiki that stopped being true, and in whoever wrote it. So every task
 starts by reconstructing it, and the agent reconstructs it wrong.
 
-GitMir answers that question instead of re-deriving it. The answering happens in the
-laboratory; this is the tool you run next to your code.
+GitMir answers that question instead of re-deriving it. The answering happens in
+Intelligence; this is the tool you run next to your code.
 
 ```
                  YOUR REPOSITORY
                         │
                         ▼
           ┌───────────────────────────┐
-          │      THE LABORATORY       │   what the product does, and
+          │    GITMIR INTELLIGENCE    │   what the product does, and
           │      lab.gitmir.com       │   what a change would reach
           └───────────────────────────┘
                         │  MCP
@@ -37,8 +37,8 @@ laboratory; this is the tool you run next to your code.
 ```
 
 **This tool works with no account for everything that does not need a model**: the task
-queue, the findings, the audits that walk a running application, the board. Connect a
-laboratory and the same screens start answering the questions a queue cannot — what a task
+queue, the findings, the audits that walk a running application, the board. Connect
+Intelligence and the same screens start answering the questions a queue cannot — what a task
 would actually reach, and how that compares to what its ticket admits.
 
 **Zero runtime dependencies · no telemetry · MCP included**
@@ -77,7 +77,7 @@ Nine of the parts this product is made of, across two of its areas.
 A developer can implement the ticket exactly as written and still implement the wrong
 change for the product. So can an agent, faster.
 
-**→ [the laboratory](https://lab.gitmir.com)** — where that second reading is worked
+**→ [Intelligence](https://lab.gitmir.com)** — where that second reading is worked
 out, what it is confident about, and how to disagree with it.
 
 ---
@@ -144,7 +144,7 @@ confident `0%`.
 in the screen, the API, the export, or `.gitmir/audit/events.jsonl` — which
 carries no name, no email and no machine. That is not a default; it is the design.
 The per-task and per-object cuts work from the queue alone; grouping those objects
-into areas is the one part that needs a laboratory, because that is where the
+into areas is the one part that needs Intelligence, because that is where the
 areas are known.
 
 **→ [Every definition, and what each one refuses to claim](docs/CHANGE-AUDIT.md)**
@@ -192,11 +192,11 @@ gitmir
 <sub>Clones into <code>~/.gitmir/local</code>, links one command onto your PATH, and pulls nothing from a package registry. <a href="install.sh">Read the installer</a> — it is short on purpose. There is no npm route: <code>npm i -g</code> would put this under <code>node_modules</code>, where Node refuses to strip TypeScript types.</sub>
 
 **http://localhost:4599** → add a project folder. The queue, the findings and the
-audits work immediately; the screens that describe the product ask you to connect a
-laboratory, because that is where the answering happens.
+audits work immediately; the screens that describe the product ask you to connect
+Intelligence, because that is where the answering happens.
 
 Reading a repository and working out what it does is the expensive part, and it is done
-once, in the laboratory, rather than on every machine that wants an answer. What comes back
+once, in Intelligence, rather than on every machine that wants an answer. What comes back
 here is answers — never a copy of the product to keep in step.
 
 | Command | |
@@ -214,12 +214,12 @@ of them still planned.
 
 ## Five minutes on your own repository
 
-Connect a laboratory — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy your key
+Connect Intelligence — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy your key
 from [your account](https://lab.gitmir.com/account/access), and hand it over once:
 
 ```
 gitmir lab ctx_your_key_here     # saved on this machine only, never in a repository
-gitmir lab add                   # let your assistant ask the laboratory directly
+gitmir lab add                   # let your assistant ask Intelligence directly
 ```
 
 `gitmir lab` on its own says whether you are connected and which products it can read.
@@ -249,12 +249,12 @@ tasks/               work, its declared scope, its approval, its history
 ```
 
 That is all of it, and it is all plain text you can read, edit and commit. A task names
-the parts of the product it will touch by their **handles** — opaque labels issued by the
-laboratory. A handle points at something and says nothing else: not its kind, not its
+the parts of the product it will touch by their **handles** — opaque labels issued by
+Intelligence. A handle points at something and says nothing else: not its kind, not its
 neighbours, not where it sits. Which is why the queue can live in a public repository
 while what it refers to does not.
 
-What the laboratory adds is the other half of the sentence: what those handles are, what
+What Intelligence adds is the other half of the sentence: what those handles are, what
 depends on them, and how far this change would really reach. That is the part nobody has
 without reading the whole product — and reading the whole product on every task is exactly
 what this exists to stop.
@@ -287,7 +287,7 @@ and the dashboard does not need to be running.** It answers from `.gitmir/` and 
 and opens no source file.
 
 The other half — what the product does, what depends on what, how far a change would
-reach — is the laboratory's own MCP endpoint, registered alongside this one.
+reach — comes from the MCP endpoint Intelligence serves, registered alongside this one.
 
 **→ [The MCP server](docs/MCP.md)** — eleven tools, and what each admits about its own
 behaviour.
@@ -338,7 +338,7 @@ other view.
 Eight skills, plain markdown in [`skills/`](skills) — read them, change them, keep your
 own. They are served as MCP prompts too, so most clients surface them as slash commands.
 
-The procedures that build and walk the model are not here. They are what the laboratory
+The procedures that build and walk the model are not here. They are what Intelligence
 does, and they are the part of this product that is not open — see
 [LICENSING.md](LICENSING.md).
 
@@ -353,7 +353,7 @@ built, and it is drawn beside the real thing in a colour that says so. Turning a
 declaration into tasks writes the checks from what was declared, so a task cannot be
 called done because code appeared — the behaviour has to be there afterwards.
 
-That screen draws from the laboratory, and it is being reconnected to it. Until then it
+That screen draws from Intelligence, and it is being reconnected to it. Until then it
 says so rather than showing an empty frame.
 
 
@@ -414,7 +414,7 @@ holds nothing but the fonts and the GITMIR marks, and no diagram library at all.
 the findings and the change audit run here and are stored in your project. There is no
 GitMir telemetry — not reduced, not anonymised, none — and no account is required for any
 of that. Set `GITMIR_LAB_KEY` and one more thing happens: questions about your product go
-to the laboratory and answers come back. Your code is in neither direction, on any path.
+to Intelligence and answers come back. Your code is in neither direction, on any path.
 ([SECURITY.md](SECURITY.md))
 
 **Your coding agent is a separate program with its own policy.** Claude Code, Cursor or

@@ -7,8 +7,8 @@ Claude Code, Cursor, or anything else that speaks
 
 Both read the same files on disk, so they cannot answer the same question two
 different ways. Questions about the product itself — what it does, what depends on
-what, how far a change reaches — are answered by neither: those go to the
-laboratory, over its own MCP endpoint.
+what, how far a change reaches — are answered by neither: those go to
+Intelligence, over its own MCP endpoint.
 
 ## Where it runs
 
@@ -91,11 +91,11 @@ Three of its commands write: `new`, `approve`, `withdraw`. The rest only read.
 
 | Tool | Answers |
 |---|---|
-| `gitmir_setup` | Prepares a project: puts it on the dashboard, creates the task queue, and says what is still missing — including whether a laboratory is connected, which is where the answers about the product come from. |
+| `gitmir_setup` | Prepares a project: puts it on the dashboard, creates the task queue, and says what is still missing — including whether Intelligence is connected, which is where the answers about the product come from. |
 | `gitmir_skills` · `gitmir_skill` | The written procedures and their full text. Prompts only fire when a person types a slash command; these are tools, so the agent can fetch a procedure and follow it on its own. |
 | `gitmir_queue` | What work is planned, what does each task touch, what is approved? |
 | `gitmir_flag` | Record that the code does not do what the product says. Written at the moment it is noticed, in one call — a finding described only in a reply is gone when the conversation ends. |
-| `gitmir_attention` | What needs a person right now: deviations whose files have since changed, tasks queued without approval, work that has stalled. Each item says what closes it. Call it at the start of a session instead of asking what to do. It answers from this repository only — what a change reaches, and how far, is a question for the laboratory. |
+| `gitmir_attention` | What needs a person right now: deviations whose files have since changed, tasks queued without approval, work that has stalled. Each item says what closes it. Call it at the start of a session instead of asking what to do. It answers from this repository only — what a change reaches, and how far, is a question for Intelligence. |
 | `gitmir_findings` | What is already known to be wrong, what was accepted on purpose and by whom, and what needs re-checking because the code has moved since. |
 | `gitmir_accept_finding` | Record the decision: accepted (needs a name and a reason), fixed, or reopened. |
 | `gitmir_create_task` | Turn a finding into queued work. Refuses to write a task with no `verify` steps — a requirement you cannot check is a wish, not a task. |
@@ -103,7 +103,7 @@ Three of its commands write: `new`, `approve`, `withdraw`. The rest only read.
 | `gitmir_progress` | Say what you are doing right now, so the person watching the dashboard sees a status instead of a blank wait — above all `blocked`, with the question you are waiting on. |
 
 These are the tools that work with nothing but your repository. What the product does,
-what depends on what, and what a change would reach are answered by the laboratory over
+what depends on what, and what a change would reach are answered by Intelligence over
 its own MCP endpoint — see [lab.gitmir.com](https://lab.gitmir.com). Every answer from
 there states how fresh the model is, because in an editor there is no banner to show it.
 
@@ -113,7 +113,7 @@ Connect the server, then tell your agent *set this project up with GitMir*. It
 calls `gitmir_setup`, which registers the folder with the dashboard — asking a
 running one over its own API, or writing the list itself if nothing answers —
 creates `tasks/todo|inprogress|verify|done`, and reports what is left — including
-whether a laboratory is connected, and how to connect one if not.
+whether Intelligence is connected, and how to connect it if not.
 
 ### Saying what it is doing
 
@@ -171,7 +171,7 @@ says **re-check** rather than continuing to assert something about code that has
 ## What it does not answer
 
 What the product does, what depends on what, how far a change would reach, and how the
-product has changed over time are answered by the laboratory, not by this server. The
+product has changed over time are answered by Intelligence, not by this server. The
 procedures that produce those answers are not in this repository.
 
 This server answers from what is in your repository and nowhere else: the task queue,

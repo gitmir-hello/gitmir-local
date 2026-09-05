@@ -641,12 +641,12 @@ function projectRework(projectPath: string) {
 }
 
 /**
- * Which products the laboratory holds for this key — asked once, kept for seconds.
+ * Which products Intelligence holds for this key — asked once, kept for seconds.
  *
  * The model is not on this machine, so "is this project mapped" is a question only
- * the laboratory can answer. The home screen asks it for every tile on every
+ * Intelligence can answer. The home screen asks it for every tile on every
  * refresh, which is why the answer is one call for the whole list rather than one
- * per project, and why it is cached and given a deadline: a laboratory that is slow
+ * per project, and why it is cached and given a deadline: Intelligence being slow
  * or unreachable must not hold up the first screen. An empty list means "nothing to
  * match against", never "this project has no model" — that difference is what keeps
  * a quiet network from relabelling every tile.
@@ -664,9 +664,9 @@ async function labProjectIds(): Promise<string[]> {
 }
 
 /**
- * Does the laboratory hold a product for this folder?
+ * Does Intelligence hold a product for this folder?
  *
- * A folder on disk and a product in the laboratory are named by people, separately,
+ * A folder on disk and a product in Intelligence are named by people, separately,
  * so they are matched the way the viewer matches them: on the folder name with the
  * punctuation and case taken out, then on one name containing the other.
  */
@@ -930,7 +930,7 @@ const server = http.createServer(async (req, res) => {
       walk(p, 0);
       // Раньше сюда добавлялась подсказка из модели: какие экраны обращаются к
       // этому маршруту. Это сильнее текстового совпадения — и это ответ, который
-      // теперь даёт лаборатория, а не чтение чужой папки на этой машине.
+      // теперь даёт Intelligence, а не чтение чужой папки на этой машине.
       return sendJSON(res, 200, { hits, searched, fromModel: [] });
     }
     if (req.method === 'GET' && url.pathname === '/api/env') {
@@ -940,18 +940,18 @@ const server = http.createServer(async (req, res) => {
       // A tile that only says its own name is a folder shortcut. These three counts are
       // what makes the home screen worth looking at: whether the product has been mapped,
       // whether work is waiting, and whether anything has happened here at all. The last
-      // two are a directory listing; the first is one cached question to the laboratory
+      // two are a directory listing; the first is one cached question to Intelligence
       // for the whole list, so this stays cheap enough to run on every refresh.
       const countIn = (dir: string): number => {
         try { return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).length; } catch { return 0; }
       };
-      /* Признак «размечен» — из лаборатории, а не с диска.
+      /* Признак «размечен» — из Intelligence, а не с диска.
        *
        * Здесь стояла проверка локального файла модели. Модель этот тул больше не
-       * пишет и не читает: она в лаборатории. На свежей машине такой проверки нет
+       * пишет и не читает: она в Intelligence. На свежей машине такой проверки нет
        * ни у одного проекта, а у кого остался старый каталог — плитка светилась
        * «Mapped» по мусору. Спрашиваем того, у кого модель есть, одним вызовом на
-       * весь список; лаборатория молчит — плитки просто не подтверждают разметку. */
+       * весь список; Intelligence молчит — плитки просто не подтверждают разметку. */
       const known = await labProjectIds();
       const list = loadProjects().map((p) => {
         const exists = fs.existsSync(p.path);
@@ -1114,7 +1114,7 @@ const server = http.createServer(async (req, res) => {
     // touch, before it runs) and a `touched` array in .claude/tasks.json (what a
     // finished task actually touched). Everything downstream — blast radius, risk,
     // the timeline, the heat map — is a view over these two lists.
-    /* Модель — из лаборатории.
+    /* Модель — из Intelligence.
      *
      * Этот маршрут стоит там, где раньше стоял `/api/model`, и отвечает на тот же
      * вопрос. Разница в том, откуда берётся ответ: не с диска этой машины, а от
@@ -1123,7 +1123,7 @@ const server = http.createServer(async (req, res) => {
     /* Коннектор: забрать и запустить.
      *
      * Для репозиториев, которые не могут покинуть эту машину. Обычный путь —
-     * подключить репозиторий в лаборатории, она сама его тянет; этот нужен там,
+     * подключить репозиторий в Intelligence, он сам его тянет; этот нужен там,
      * где такого делать нельзя. */
     if (req.method === 'GET' && url.pathname === '/api/connector') {
       return sendJSON(res, 200, { installed: connectorInstalled(), lab: lab(),
@@ -1146,11 +1146,11 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
-    /* Ввод ключа лаборатории.
+    /* Ввод ключа Intelligence.
      *
      * До сих пор подключиться из пульта было нечем: ключ читался только из
      * переменной окружения, а о ней не было сказано ни на одном экране. Человек
-     * видел «лаборатория не подключена» и не имел ни одного способа это
+     * видел «Intelligence не подключён» и не имел ни одного способа это
      * изменить — самая дорогая поломка из всех, потому что она выглядит как
      * отсутствие возможности, а не как дефект.
      *
@@ -1168,12 +1168,12 @@ const server = http.createServer(async (req, res) => {
       try { labRemember(given); }
       catch (e: any) { return sendJSON(res, 400, { error: String(e?.message || e) }); }
       /* Проверяем связь, а не только форму ключа. «Сохранено» без ответа от
-       * лаборатории — то же самое обещание без проверки, от которого этот экран
+       * Intelligence — то же самое обещание без проверки, от которого этот экран
        * и лечится. */
       const seen = await labView('projects', {});
       if ((seen as any).error) {
         labForget();
-        return sendJSON(res, 400, { error: 'The laboratory did not accept that key: ' + (seen as any).error });
+        return sendJSON(res, 400, { error: 'Intelligence did not accept that key: ' + (seen as any).error });
       }
       const products = ((seen as any).projects || []).map((x: any) => x.id).filter(Boolean);
       return sendJSON(res, 200, { ok: true, connected: true, products });
@@ -1183,13 +1183,13 @@ const server = http.createServer(async (req, res) => {
       if (!labConnected()) return sendJSON(res, 200, needsLab('The model of this product'));
       /* Карта областей — то, с чего начинается смотрелка. Она приходит проекцией:
        * имена, деловые слова, ручки. Ни идентификатора, ни устройства. */
-      /* Пульт знает путь на диске, лаборатория — имя продукта. Это разные вещи.
+      /* Пульт знает путь на диске, Intelligence — имя продукта. Это разные вещи.
        *
        * Здесь стояло чтение `project`, а пульт всё это время слал `path`, — и
        * смотрелка была мертва целиком: карта запрашивалась без имени продукта и
        * приходила пустой. Связка нужна настоящая, а не переименование параметра:
-       * по имени папки ищем продукт среди тех, что лаборатория за этим ключом
-       * показывает. Не нашли — говорим прямо и перечисляем, что у неё есть.
+       * по имени папки ищем продукт среди тех, что Intelligence за этим ключом
+       * показывает. Не нашли — говорим прямо и перечисляем, что у него есть.
        * Молча показать чужой продукт было бы хуже пустого экрана. */
       const asked = url.searchParams.get('project') || '';
       const local = url.searchParams.get('path') || '';
@@ -1206,9 +1206,9 @@ const server = http.createServer(async (req, res) => {
           return sendJSON(res, 200, {
             exists: false, connected: true, lab: lab(),
             error: list.length
-              ? 'The laboratory has no product under this folder\u2019s name. It knows: ' + list.join(', ')
+              ? 'Intelligence has no product under this folder\u2019s name. It knows: ' + list.join(', ')
                 + '. Connect this repository there, or open one of those.'
-              : 'This key can read no products yet. Connect a repository in the laboratory first.',
+              : 'This key can read no products yet. Connect a repository in Intelligence first.',
             products: list,
           });
         }
@@ -1224,11 +1224,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/changes') {
       const p = url.searchParams.get('path') || '';
       if (!p) return sendJSON(res, 400, { error: 'no path' });
-      /* Задачи ссылаются на ручки, выданные лабораторией.
+      /* Задачи ссылаются на ручки, выданные Intelligence.
        *
        * Проверить их против модели здесь нечем — модели на этой машине нет.
-       * Раньше отсюда отсеивались опечатки; теперь это делает лаборатория, когда
-       * подключена, а без неё берём написанное как есть: пустая доска на машине,
+       * Раньше отсюда отсеивались опечатки; теперь это делает Intelligence, когда
+       * подключён, а без него берём написанное как есть: пустая доска на машине,
        * которая просто не подключена, хуже лишней строки. */
       const heat: Record<string, number> = {};
       const tasks: { col: string; file: string; n: number; title: string; ids: string[]; declared: boolean;
@@ -1335,8 +1335,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/steps') {
       const p = url.searchParams.get('path') || '';
       if (!p) return sendJSON(res, 400, { error: 'no path' });
-      /* Есть ли модель — знает лаборатория, не мы. Шаг «модель построена»
-       * превратился в шаг «лаборатория подключена»: строить её здесь больше
+      /* Есть ли модель — знает Intelligence, не мы. Шаг «модель построена»
+       * превратился в шаг «Intelligence подключён»: строить её здесь больше
        * нечем, а подключить — единственное, что от человека требуется. */
       const hasLab = labConnected();
       const src = sourceBytes(p);
@@ -1352,7 +1352,7 @@ const server = http.createServer(async (req, res) => {
       // it had no reason to say is how somebody sits on the wrong screen while the
       // work happens behind it.
       const agentSeen = !!prog || readUsage(p, 400).some((e: any) => e && e.by && e.by !== 'human');
-      const objects = 0;                       // счёт частей продукта — вопрос к лаборатории
+      const objects = 0;                       // счёт частей продукта — вопрос к Intelligence
       let tasks = 0;
       for (const col of ['todo', 'inprogress', 'verify', 'done']) {
         try { tasks += fs.readdirSync(path.join(p, 'tasks', col)).filter((f) => f.endsWith('.md')).length; } catch {}
@@ -1390,7 +1390,7 @@ const server = http.createServer(async (req, res) => {
       if (!p) return sendJSON(res, 400, { error: 'no path' });
       /* Всё, что видно с этой машины. Модель сюда больше не входит.
        *
-       * Она в лаборатории, и оттуда же придут числа про неё, когда у неё
+       * Она в Intelligence, и оттуда же придут числа про неё, когда у него
        * появится чем отвечать. Здесь остаётся то, что и правда лежит на диске:
        * задачи, находки, расход и размер исходников. */
       const tasks = readTasks(p);
@@ -1400,14 +1400,14 @@ const server = http.createServer(async (req, res) => {
       /* `exists` — «есть ли откуда взять модель», и ответ на это даёт ключ.
        *
        * Здесь стояло жёсткое `false`, и это был тупик: шаги пускают на этот экран
-       * ровно тогда, когда лаборатория подключена (шаг 3 — это `hasLab`), а экран
+       * ровно тогда, когда Intelligence подключён (шаг 3 — это `hasLab`), а экран
        * первым же условием писал «карта пропала» и предлагал начать сначала —
-       * то есть вернуться на тот же экран. Ответ должен говорить о лаборатории то
+       * то есть вернуться на тот же экран. Ответ должен говорить об Intelligence то
        * же, что говорят шаги рядом, иначе пульт спорит сам с собой. По той же
        * причине `exists` идёт и в attention/nextSkill: с `false` первый пункт
-       * списка сообщал «лаборатория не подключена» подключённому человеку.
+       * списка сообщал «Intelligence не подключён» подключённому человеку.
        *
-       * Знает ли лаборатория именно этот продукт — вопрос смотрелки: она его
+       * Знает ли Intelligence именно этот продукт — вопрос смотрелки: она его
        * задаёт и на него отвечает по-человечески, вместе со списком того, что
        * там есть. Ставить тот же вопрос здесь значило бы вернуть тупик. */
       const hasLab = labConnected();
@@ -1483,7 +1483,7 @@ const server = http.createServer(async (req, res) => {
 
       const events = auditEvents(p);
       const m = auditMetrics(events, { periodDays: days, idleCutoffHours: idle });
-      // Имена областей знает лаборатория; здесь они приходят ручками и остаются
+      // Имена областей знает Intelligence; здесь они приходят ручками и остаются
       // ручками, пока их не с чем сопоставить.
       const areas: Record<string, string> = {};
       return sendJSON(res, 200, {
@@ -1546,7 +1546,7 @@ const server = http.createServer(async (req, res) => {
       // The browser knows which objects it showed; only this side knows what the
       // files they live in weigh, so the comparison is computed here.
       // Во что обошёлся бы тот же вопрос без модели, считается по модели — то
-      // есть в лаборатории. Здесь остаётся сам факт: что спросили и что отдали.
+      // есть в Intelligence. Здесь остаётся сам факт: что спросили и что отдали.
       const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String) : [];
       recordUse(p, { ...body, ids, wouldFiles: 0, wouldBytes: 0, by: 'person' });
       return sendJSON(res, 200, { ok: true });

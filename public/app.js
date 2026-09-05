@@ -1,6 +1,6 @@
 // Sharing a map from here is gone, not hidden: both halves of it (a snapshot file and a
 // link) asked for server routes that do not exist, and a button that answers 404 is worse
-// than no button. The map is read from the laboratory, so a guest is invited there.
+// than no button. The map is read from Intelligence, so a guest is invited there.
 
 // A shared view runs this exact file with the model handed to it instead of fetched, and
 // with everything that writes disabled. Same renderer as the dashboard, by construction —
@@ -99,7 +99,7 @@ function renderList(){
     e.innerHTML = projects.length
       ? 'Nothing matches <b>' + esc(searchEl.value.trim()) + '</b>.'
       : 'No projects yet. <b>＋ Add project</b> and point it at any folder on any disk — '
-        + 'then open it, connect a laboratory, and the map, the queue and the log fill up as you work.';
+        + 'then open it, connect Intelligence, and the map, the queue and the log fill up as you work.';
     listEl.appendChild(e); return;
   }
   list.forEach((p, i) => {
@@ -451,7 +451,7 @@ function renderSkillButtons(){
   // something else.
   /* Здесь стояла ветка «сначала показать сборщик модели, потом остальное».
    *
-   * Сборщика больше нет: модель строится в лаборатории, и переменная под него
+   * Сборщика больше нет: модель строится в Intelligence, и переменная под него
    * осталась пустой. Ветка от этого стала недостижимой, а строка, вычислявшая
    * «этот шаг и есть сборщик», продолжала читать поле у пустого значения — и
    * роняла отрисовку панели, как только появлялся следующий шаг. Первый показ
@@ -902,7 +902,7 @@ function renderMcpBox(){
       'Register this project with your agent',
       'One command, once. It writes a line into your Claude config and nothing else — no service and no port. '+
       'Registered for every project: the server answers about whichever folder your editor is open in. The model '+
-      'itself comes from the laboratory over <code>GITMIR_LAB_KEY</code>, so that part does need an account; '+
+      'itself comes from Intelligence over <code>GITMIR_LAB_KEY</code>, so that part does need an account; '+
       'the queue, the findings and the audits do not.',
       add,
       (isCodex
@@ -960,7 +960,7 @@ function renderMcpBox(){
     '<div class="mcp-card warn">'+
       '<div class="mcp-card-t">If the answers are not what you expected</div>'+
       '<div class="mcp-q"><b>Everything comes back "there is no model here yet".</b> Not a broken connection — this '+
-      'machine is not pointed at a laboratory, which is where the model of a product is built and kept. Open '+
+      'machine is not pointed at Intelligence, which is where the model of a product is built and kept. Open '+
       '<a href="https://lab.gitmir.com/account/access" target="_blank" rel="noopener">lab.gitmir.com/account/access</a>, '+
       'copy the key, set it as <code>GITMIR_LAB_KEY</code> in the environment, and start the server again.</div>'+
       '<div class="mcp-q"><b>No gitmir_ tools are listed.</b> The client has not re-read its config. Restart it, then '+
@@ -1055,17 +1055,17 @@ function labCard(d){
   const L = (d && d.lab) || {};
   const how = ((d && d.how) || []).map(x=>'<li>'+esc(x)+'</li>').join('');
   return '<div class="model-empty lab-card">'
-    + '<h3>The model lives in the laboratory</h3>'
-    + '<p>'+esc((d && d.error) || 'This machine is not connected to a laboratory yet.')+'</p>'
+    + '<h3>The model lives in Intelligence</h3>'
+    + '<p>'+esc((d && d.error) || 'This machine is not connected to Intelligence yet.')+'</p>'
     + (how ? '<ul>'+how+'</ul>' : '')
     + '<p class="lab-go">'
-    +   '<a class="btn primary" href="'+esc(L.signUp||'https://lab.gitmir.com/signup')+'" target="_blank" rel="noopener">Open the laboratory</a> '
+    +   '<a class="btn primary" href="'+esc(L.signUp||'https://lab.gitmir.com/signup')+'" target="_blank" rel="noopener">Get Intelligence</a> '
     +   '<a class="btn" href="'+esc(L.signIn||'https://lab.gitmir.com/login')+'" target="_blank" rel="noopener">I already have an account</a>'
     + '</p>'
     /* Поле для ключа стоит здесь, а не в настройках.
      *
      * Это единственный экран, на котором человек узнаёт, что подключения нет, —
-     * и до сих пор он же был тупиком: рассказывал про лабораторию и не давал
+     * и до сих пор он же был тупиком: рассказывал про Intelligence и не давал
      * ничего сделать. Способ подключиться должен стоять там, где сказано, что
      * подключения нет. */
     + '<div class="lab-key">'
@@ -1082,15 +1082,15 @@ function labCard(d){
 /* Подключение по ключу, введённому руками.
  *
  * Ключ уходит на свой же сервер и обратно не возвращается ни разу: поле
- * очищается сразу, а ответ говорит только о том, что лаборатория приняла и что
- * теперь видно. Ошибку показываем словами лаборатории — «ключ не подошёл»
- * человек чинит иначе, чем «лаборатория не отвечает». */
+ * очищается сразу, а ответ говорит только о том, что Intelligence принял и что
+ * теперь видно. Ошибку показываем словами Intelligence — «ключ не подошёл»
+ * человек чинит иначе, чем «Intelligence не отвечает». */
 function wireLabKey(){
   const btn=document.getElementById('labKeySave'); if(!btn) return;
   const inp=document.getElementById('labKey'), say=document.getElementById('labKeySay');
   const go=async()=>{
     const v=(inp.value||'').trim(); if(!v) return;
-    btn.disabled=true; say.className='lab-key-say'; say.textContent='Asking the laboratory…';
+    btn.disabled=true; say.className='lab-key-say'; say.textContent='Asking Intelligence…';
     try{
       const r=await fetch('/api/lab/key',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({key:v})});
@@ -1116,7 +1116,7 @@ function drawMap(view, d){
   const areas=d.areas||[], links=d.links||[];
   if(!areas.length){
     view.innerHTML='<div class="model-empty"><b>Nothing has been read yet.</b><br>'
-      +'The laboratory has this repository but no model of it. Build one there, and this fills in.</div>';
+      +'Intelligence has this repository but no model of it. Build one there, and this fills in.</div>';
     return;
   }
   const head='<div class="lab-fresh">'+esc(d.freshness||'')
@@ -1143,7 +1143,7 @@ async function openArea(view, which){
   view.innerHTML='<div class="model-empty">Opening…</div>';
   let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(selected)
     +'&area='+encodeURIComponent(which))).json(); }
-  catch{ view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
+  catch{ view.innerHTML='<div class="model-empty">Failed to reach Intelligence.</div>'; return; }
   if(d.error){ view.innerHTML='<div class="model-empty">'+esc(d.error)+'</div>'; return; }
   const rows=(d.inside||[]).map(o=>'<li data-h="'+esc(o.handle)+'"><b>'+esc(o.name)+'</b> <i>'+esc(o.kind)+'</i>'
     +(o.description?'<p>'+esc(o.description)+'</p>':'')+'</li>').join('');
@@ -1171,7 +1171,7 @@ async function openThing(view, handle, backTo){
   view.innerHTML='<div class="model-empty">Opening…</div>';
   let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(selected)
     +'&subject='+encodeURIComponent(handle))).json(); }
-  catch{ view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
+  catch{ view.innerHTML='<div class="model-empty">Failed to reach Intelligence.</div>'; return; }
   if(d.error){ view.innerHTML='<div class="model-empty">'+esc(d.error)+'</div>'; return; }
   const side=(rows,none)=>rows.length
     ? '<ul class="inside">'+rows.map(x=>'<li data-h="'+esc(x.handle)+'"><b>'+esc(x.name)+'</b> <i>'
@@ -1191,15 +1191,15 @@ async function loadModel(pathStr){
   const view=document.getElementById('modelView'); if(!view) return;
   const req = ++modelReq;   // this call's identity
   view.innerHTML='<div class="model-empty">Loading model…</div>';
-  /* Модель приходит из лаборатории, а не с этого диска.
+  /* Модель приходит из Intelligence, а не с этого диска.
    *
-   * Пока она не подключена, отвечать нечем — и экран говорит об этом прямо,
+   * Пока он не подключён, отвечать нечем — и экран говорит об этом прямо,
    * вместо пустой рамки, которая читается как поломка. */
   let d; try{ d=await (await fetch('/api/lab?path='+encodeURIComponent(pathStr))).json(); }
-  catch{ if(req===modelReq) view.innerHTML='<div class="model-empty">Failed to reach the laboratory.</div>'; return; }
+  catch{ if(req===modelReq) view.innerHTML='<div class="model-empty">Failed to reach Intelligence.</div>'; return; }
   if(req!==modelReq) return;
   if(d && d.connected===false){ view.innerHTML=labCard(d); wireLabKey(); modelData=null; return; }
-  if(d && d.error){ view.innerHTML='<div class="model-empty"><b>The laboratory could not answer.</b><br>'+esc(d.error)+'</div>'; modelData=null; return; }
+  if(d && d.error){ view.innerHTML='<div class="model-empty"><b>Intelligence could not answer.</b><br>'+esc(d.error)+'</div>'; modelData=null; return; }
   modelData=d; modelFor=pathStr;
   drawMap(view, d);
 }
@@ -1250,7 +1250,7 @@ async function renderHome(pathStr){
   const s=o.usage.summary, C=o.caught;
   /* Модель здесь может отсутствовать — и обычно отсутствует.
    *
-   * Она живёт в лаборатории, и сервер честно отдаёт `model: null`. Строка ниже
+   * Она живёт в Intelligence, и сервер честно отдаёт `model: null`. Строка ниже
    * читала поле у этого `null` и роняла отрисовку целиком: экран навсегда
    * оставался на «Reading the project…», ничего не сообщив. Отсутствие модели —
    * обычное состояние, а не сбой, и рисовать надо и его. */
@@ -1260,7 +1260,7 @@ async function renderHome(pathStr){
   h+='<div class="hm-top"><div class="hm-name">'+esc(p.name||pathStr.split('/').pop())+'</div>'+
      '<div class="hm-path">'+esc(pathStr)+'</div></div>';
 
-  // The map is kept in the laboratory, so "no map here" is an ordinary state rather than
+  // The map is kept in Intelligence, so "no map here" is an ordinary state rather than
   // a loss — nothing on this disk went missing. Previously this branch printed "the map is
   // gone", offered a button that redrew the same screen, and stopped: everything else this
   // machine does know about the project — what needs a person, the queue, the record — was
@@ -1269,9 +1269,9 @@ async function renderHome(pathStr){
   h+='<div class="hm-hero'+(o.exists?'':' empty')+'">';
   if(!o.exists){
     h+='<div class="hm-hero-h">No map of this product yet</div>'+
-       '<p>The map is built and kept in the laboratory — it is never written into this folder. '+
-       'Point this machine at a laboratory that has read this repository, and everything below fills in.</p>'+
-       '<div class="hm-next"><button class="run" data-go="lab">Connect a laboratory</button></div>';
+       '<p>The map is built and kept in Intelligence — it is never written into this folder. '+
+       'Point this machine at Intelligence once it has read this repository, and everything below fills in.</p>'+
+       '<div class="hm-next"><button class="run" data-go="lab">Connect Intelligence</button></div>';
   } else if(s.answers){
     // Two different claims, and only the first is about size. The second is the one
     // people actually want: not "how much less was read" but "would I have found all
@@ -1279,7 +1279,7 @@ async function renderHome(pathStr){
     //
     // The headline is a measured fact or it is nothing. Nothing records the size of the
     // source an answer stood in any more — that is read where the repository is read, in
-    // the laboratory — so the division has no numerator, and "0.0×" set in the largest
+    // Intelligence — so the division has no numerator, and "0.0×" set in the largest
     // type on the screen is a claim rather than a missing value.
     const measured = s.asked > 0 && s.askedWould > 0;
     h+=(measured ? '<div class="hm-big">'+s.ratio.toFixed(1)+'×</div><div class="hm-big-l">less read to answer</div>' : '')+
@@ -1358,20 +1358,20 @@ async function renderHome(pathStr){
   // --- what you have --------------------------------------------------------
   // "Your product, mapped" used to stand first here, counting things and adding up bytes
   // off a model file on this disk. There is no such file, so both numbers were invented —
-  // one of them by a function that does not exist. The Model tab shows the laboratory's own
-  // totals, which are the only ones anybody should be quoting.
+  // one of them by a function that does not exist. The Model tab shows the totals from
+  // Intelligence, which are the only ones anybody should be quoting.
   //
   // Freshness is a positive claim, and it is made by whoever holds the map. Nothing here
   // compares anything: `stale` arrives as a literal false, so "Matches your code" was said
   // about a repository nobody had looked at. The card claims it only when the answer
-  // actually carries a freshness signal — which is what the laboratory sends with the map,
+  // actually carries a freshness signal — which is what Intelligence sends with the map,
   // and which this screen will pass on the day it is given one.
   const freshKnown = !!(o.freshness || o.stale || o.staleFile);
   h+='<div class="hm-sec">What you have</div><div class="hm-row">'+
      card('Read out of your code', o.source.files+' file'+(o.source.files===1?'':'s'), KB(o.source.bytes)+' of code, read once so nobody has to read it again', null)+
      (freshKnown
        ? card('Still true?', o.stale?'Your code has moved on':'Matches your code',
-              o.stale? esc(o.staleFile||'')+' changed after the map was made — ask the laboratory to read it again' : 'Nothing has changed since the map was made', 'model', o.stale?'warn':'')
+              o.stale? esc(o.staleFile||'')+' changed after the map was made — ask Intelligence to read it again' : 'Nothing has changed since the map was made', 'model', o.stale?'warn':'')
        : card('Still true?', 'Not known here',
               'The map states its own freshness, and this machine has not been handed one. The Model tab says it before it draws anything.', 'model'))+
      '</div>';
@@ -1402,16 +1402,16 @@ async function renderHome(pathStr){
       const g=b.dataset.go, arg=b.dataset.arg;
       if(g==='mcp'){ setTab('settings'); setupSub='mcp'; renderDetail(); return; }
       if(g==='build-model'||g==='skill'){ setTab('settings'); setupSub='skills'; renderDetail(); return; }
-      // Everything about the product opens the Model tab, which reads the laboratory.
+      // Everything about the product opens the Model tab, which reads Intelligence.
       //
-      // 'lab' arrives from the attention list ("Connect one"). There is no lab tab and no
-      // lab pane, so setTab('lab') took the active class off every tab and every pane and
-      // left an empty frame; the Model tab is where a laboratory is actually reached, and
+      // 'lab' arrives from the attention list ("Connect Intelligence"). There is no lab tab
+      // and no lab pane, so setTab('lab') took the active class off every tab and every pane
+      // and left an empty frame; the Model tab is where Intelligence is actually reached, and
       // unconnected it draws the card with the sign-in and the key.
       //
       // 'impact', 'spec' and 'ownership' used to open a sub-view of a model held on this
       // disk. Those sub-views are gone with it, so asking for one by name is a way to land
-      // nowhere. The map the laboratory serves is what the tab shows now.
+      // nowhere. The map Intelligence serves is what the tab shows now.
       if(g==='lab'||g==='model'||g==='impact'||g==='spec'||g==='ownership'){ setTab('model'); return; }
       setTab(g);
     }));
@@ -1582,7 +1582,7 @@ function queuePrice(file){
  * «поделиться картой». Он остался от времени, когда модель строилась и хранилась
  * на этой машине.
  *
- * Модель уехала в лабораторию, а вместе с ней ушли и функции, на которых слой
+ * Модель уехала в Intelligence, а вместе с ней ушли и функции, на которых слой
  * стоял: kindOf, labelOf, objById, blastRadius — их в этом репозитории нет ни
  * одной. То есть слой не просто не нужен: любая ветка, до него дотянувшаяся,
  * падала с ReferenceError. Держался он лишь на том, что дотянуться было неоткуда —
@@ -1591,10 +1591,10 @@ function queuePrice(file){
  * Вырезан целиком, и вместе с ним — таблица наших видов объектов с приставками
  * идентификаторов. Ей в открытом репозитории не место: клиент видит смысл своего
  * продукта, но не то, из чего у нас собрана модель. Карту и радиус рисует
- * вкладка Model по проекции от лаборатории. */
+ * вкладка Model по проекции от Intelligence. */
 
 function queueImpact(file){
-  /* Радиус изменения знает лаборатория, а не этот файл. Пока вкладка Model не
+  /* Радиус изменения знает Intelligence, а не этот файл. Пока вкладка Model не
    * отдаст его вместе с задачей, здесь честно нечего показать — и это лучше
    * числа, посчитанного ни по чему. */
   return null;
@@ -2186,7 +2186,7 @@ function mirrorHtml(s){
     || 'Nothing leaves this machine';
   const note={local:'The relay routes between your machines live and keeps nothing.',
               tasks:'Task titles, bodies, status and acceptance criteria are stored on GitMir so your team can follow along. Source code never is.',
-              full:'Tasks and a snapshot of the laboratory are stored on GitMir. Source code never is.'}[lvl]||'';
+              full:'Tasks and a snapshot of the model from Intelligence are stored on GitMir. Source code never is.'}[lvl]||'';
   return '<div class="mirror-hd"><span class="mirror-dot '+esc(lvl)+'"></span><b>'+esc(label)+'</b>'
     + '<span class="mirror-lvl">'+esc(lvl)+'</span></div>'
     + '<div class="mirror-note">'+esc(note)+' Set by the project owner at ide.gitmir.com — it cannot be changed from here.</div>';
@@ -2663,9 +2663,9 @@ const UNLOCKS = [
 ];
 
 function stepRail(step){
-  // Step two connects the laboratory; nothing is made here. The rail is the one line
+  // Step two connects Intelligence; nothing is made here. The rail is the one line
   // that says what the screen it sits on is for, so it says the same thing.
-  const names = ['Connect your assistant', 'Connect the laboratory', 'Everything else'];
+  const names = ['Connect your assistant', 'Connect Intelligence', 'Everything else'];
   let h = '<div class="st-rail">';
   names.forEach((n,i)=>{
     const k = i+1;
@@ -2729,7 +2729,7 @@ function renderSteps(view, pathStr, d){
     h += '<h2 class="st-h">Two moves and your assistant is connected</h2>'
       +  '<p class="st-p">Registering the server asks nothing of you — no account, no password, and nothing '
       +  'leaves your computer: it writes one line into your assistant\'s config. The map itself is read from '
-      +  'the laboratory, with a key you set in the next step. It takes about ten seconds.</p>'
+      +  'Intelligence, with a key you set in the next step. It takes about ten seconds.</p>'
       +  '<div class="st-agent"><span class="st-agent-l">Which assistant</span>'+agentRadios('')+'</div>'
       +  '<div class="st-do">'
       +  '<div class="st-do-c one"><div class="num">1</div>'
@@ -2753,7 +2753,7 @@ function renderSteps(view, pathStr, d){
   }
 
   else {
-    // The last thing between somebody and the product is connecting the laboratory —
+    // The last thing between somebody and the product is connecting Intelligence —
     // not building anything here.
     //
     // This screen used to say "open your agent in this folder and tell it to build the
@@ -2768,7 +2768,7 @@ function renderSteps(view, pathStr, d){
     const brief  = d.brief || '';
 
     h += '<div class="st-mid">'
-      +  '<div class="big">Now connect the laboratory</div>'
+      +  '<div class="big">Now connect Intelligence</div>'
       +  '<p>The map of your product — its parts, what they do, and what a change would reach — is built and '
       +  'kept at <b>lab.gitmir.com</b> from the code in this repository. It is not built on this machine and '
       +  'nothing about it is written into this folder. The dashboard reads it with a key, and so does your '
@@ -2779,9 +2779,9 @@ function renderSteps(view, pathStr, d){
 
     h += '<div class="st-do-c one"><div class="num">1</div>'
       +    '<h5>Get a key</h5>'
-      +    '<p>Sign in to the laboratory and open your access page. It is the same key your assistant uses '
+      +    '<p>Sign in to Intelligence and open your access page. It is the same key your assistant uses '
       +    'through MCP, so this is done once for both.</p>'
-      // Links, not buttons: they open the laboratory in another tab. The button classes
+      // Links, not buttons: they open Intelligence in another tab. The button classes
       // are class-scoped, so they style an <a> too — the two properties a browser gives a
       // link and not a button are the ones set here.
       +    '<div class="act two">'
@@ -2806,7 +2806,7 @@ function renderSteps(view, pathStr, d){
 
     h += '</div>';
 
-    // An empty folder is the one case where the laboratory has nothing to read. What gets
+    // An empty folder is the one case where Intelligence has nothing to read. What gets
     // written here is a plain file in the repository, read along with the code — the map
     // is still made there, not here.
     if(!d.hasCode && !brief){
@@ -2829,7 +2829,7 @@ function renderSteps(view, pathStr, d){
     h += '<div class="st-note">Prefer to work by copying and pasting? '
       +  '<button class="st-back" data-go="skill">Open the full instruction</button>'
       +  '<br><br>Nothing about your code is copied into this folder, and the map never lands here: it is read '
-      +  'from the laboratory when a screen or your assistant asks for it.</div>';
+      +  'from Intelligence when a screen or your assistant asks for it.</div>';
 
     h += '<div class="st-un"><div class="st-un-h">And this is what opens up the second it is here</div><div class="st-un-g">';
     for(const [t2,s] of UNLOCKS) h += '<div class="st-un-i"><b>'+esc(t2)+'</b><span>'+esc(s)+'</span></div>';
@@ -2854,7 +2854,7 @@ function renderSteps(view, pathStr, d){
     }catch(e){ d2 = { error:String(e&&e.message||e) }; }
     saveBtn.disabled = false; saveBtn.textContent = 'Save it into the project';
     if(!d2 || !d2.ok){ toast('Could not save it: '+((d2&&d2.error)||'unknown'), true); return; }
-    toast('Saved as '+d2.file+' — the laboratory reads it with the rest of the repository');
+    toast('Saved as '+d2.file+' — Intelligence reads it with the rest of the repository');
     renderHome(pathStr);
   });
   // Waiting for a hello that may never come is a dead end: an assistant that never
@@ -2880,7 +2880,7 @@ function renderSteps(view, pathStr, d){
     // could report four stages in a row into a page that never redrew — the exact
     // "nothing happens" people reported.
     // `modelFiles` stood in this list and in the checklist above it. Nothing has ever sent
-    // that field: a map is not made of files here. Whether a laboratory is connected is the
+    // that field: a map is not made of files here. Whether Intelligence is connected is the
     // fact this screen now turns on, so that is what it watches.
     const sig = (x)=> !x ? '' : [x.step, x.agentSeen, x.queue, !!(x.laboratory && x.laboratory.connected), x.brief,
       x.progress && x.progress.stage, x.progress && x.progress.note, x.progress && x.progress.stale].join('|');
@@ -2894,7 +2894,7 @@ function renderSteps(view, pathStr, d){
         clearInterval(stepPoll);
         // The one moment in this product worth marking. Somebody just did the thing
         // that makes everything else exist; saying so costs nothing and lands.
-        if(n.step === 3) toast('The laboratory is connected — everything just opened up');
+        if(n.step === 3) toast('Intelligence is connected — everything just opened up');
         else if(n.agentSeen && !d.agentSeen) toast('Your assistant said hello. Connected.');
         else if(n.progress && n.progress.stage === 'blocked'
                 && !(d.progress && d.progress.stage === 'blocked')) toast('Your assistant is asking you something');

@@ -33,11 +33,11 @@ brief, a decision log. Not "what the product obviously should do" — a claim yo
 point at is not a finding, it is an opinion, and it will be argued away at exactly the
 moment it matters.
 
-**The model.** It is built and kept in the laboratory, never on this machine — connect
+**The model.** It is built and kept in Intelligence, never on this machine — connect
 this one to it before you start (`GITMIR_LAB_KEY`; `gitmir_setup` says whether you are
 connected and how). Without it a finding has nothing to attach to: it can still be
 recorded, but with no `touches` it lands in a list nobody opens instead of marking the
-thing it concerns on every diagram. If there is no laboratory, work anyway, leave
+thing it concerns on every diagram. If Intelligence is not connected, work anyway, leave
 `touches` off, and say in the report that the findings are unattached.
 
 ## How to work
@@ -48,7 +48,7 @@ required, which is backwards and misses everything the code does not do at all. 
 largest category of finding is usually a rule nobody implemented, and it is invisible
 from the code side.
 
-For each rule, find the code that carries it. Use the laboratory — the model's own
+For each rule, find the code that carries it. Use Intelligence — the model's own
 links get you from "campaign priority" to the function that sorts campaigns without
 reading the repository. Read the actual function. Then decide, out of four:
 
@@ -67,7 +67,7 @@ gitmir_flag(
   actual:      what the code does instead, naming the function you read
   consequence: what goes wrong for a person — this is what makes it arguable
   source:      where the rule is written: "spec 5.2", "docs/pricing.md", a ticket id
-  touches:     the handles the laboratory issued for the things involved — `gm_` and
+  touches:     the handles Intelligence issued for the things involved — `gm_` and
                ten characters, copied from its answer, never invented — this is what
                puts the finding on the diagrams
   readFrom:    the files you read it from — this is what makes it ask to be re-checked

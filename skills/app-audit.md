@@ -120,7 +120,7 @@ incident.
 Build the list of what exists from **three independent sources**, because each misses
 something different, and the disagreements between them are findings in their own right.
 
-1. **The laboratory**, if one is connected — ask it which screens exist, which endpoints,
+1. **Intelligence**, if it is connected — ask it which screens exist, which endpoints,
    and which flows are worth proving. Asking is what makes this source cheap: it already
    holds the answer, so you get the list without opening every file in the repository.
 2. **The router**, from the code — route definitions, page files, framework conventions
@@ -131,8 +131,8 @@ something different, and the disagreements between them are findings in their ow
 Then cross-check, and write down what does not line up:
 
 - In the router but never reachable by crawling → dead route, or UI with no link to it.
-- Reachable but not in the model → the model is out of date; note it, and ask the
-  laboratory to re-read the repository after the run.
+- Reachable but not in the model → the model is out of date; note it, and ask
+  Intelligence to re-read the repository after the run.
 - An endpoint no screen calls → dead endpoint, or a client you have not found.
 
 **On "every element".** A page has hundreds of nodes and most are decoration. The inventory
@@ -153,7 +153,7 @@ dashboard" is a use case. Audit the second, and let the first be one of its step
 
 Derive them from what you have:
 
-- **From the flows the laboratory describes** — these are already end-to-end
+- **From the flows Intelligence describes** — these are already end-to-end
   with an expected result. They are the best use cases you will get; use them first.
 - **From forms** — each form is at least three use cases: valid submission, invalid input
   rejected with a visible message, and the empty submission.
@@ -325,6 +325,6 @@ passed invites everyone to believe the app is fine.
   Mixing the two loses the record of what was broken.
 - **Cap the run and say where you capped it.** Crawl depth, page count, use cases per page —
   state the limits in the report. A silent cap reads as full coverage.
-- **If a laboratory is connected, ask it to re-read the repository after.** An audit walks
+- **If Intelligence is connected, ask it to re-read the repository after.** An audit walks
   the whole product and will find screens and routes the model is missing; leaving them out
   wastes what you just learned.

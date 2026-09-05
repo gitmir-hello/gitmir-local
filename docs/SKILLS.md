@@ -17,8 +17,8 @@ these files are read by teammates, clients, reviewers and the next session.
 
 ## Understanding what exists
 
-Reading a product and working out what it does is what the laboratory is for, and the
-procedures that do it are not in this repository. Your assistant asks the laboratory
+Reading a product and working out what it does is what Intelligence is for, and the
+procedures that do it are not in this repository. Your assistant asks Intelligence
 directly over MCP: what something is, what depends on it, what a change would reach.
 
 Register its endpoint alongside the local one — `https://lab.gitmir.com/mcp`, with the

@@ -53,7 +53,7 @@ Create `tasks/todo/NNN-<slug>.md` (zero-padded number prefix so they run in orde
     Touches: gm_261dcdf61e, gm_00facddf0a, gm_be1601b763
 
     ## Context
-    <the relevant slice of the product — ask the laboratory over MCP if one is connected:
+    <the relevant slice of the product — ask Intelligence over MCP if it is connected:
     the data, the rules, the endpoints, the screens, the notifications and the status
     changes this task touches, each named by its handle, so the runner has everything
     it needs without re-reading the whole repo>
@@ -91,12 +91,12 @@ Omit the line only if you genuinely cannot tell what the request was.
 ## The `Touches:` line
 
 List the handles of the things **this task will change** — not everything it reads.
-One line, comma-separated. A handle is what the laboratory issues for a part of the
-product: `gm_` and ten characters, opaque on purpose. Copy it from the laboratory's
-answer exactly; never invent one, and never write a descriptive name in its place —
+One line, comma-separated. A handle is what Intelligence issues for a part of the
+product: `gm_` and ten characters, opaque on purpose. Copy it exactly from what
+Intelligence answers; never invent one, and never write a descriptive name in its place —
 a name that looks meaningful but resolves to nothing is worse than an empty line,
-because it reads as an estimate somebody checked. Omit the line only when there is no
-laboratory connected.
+because it reads as an estimate somebody checked. Omit the line only when
+Intelligence is not connected.
 
 This is what turns a queue into an impact estimate. Before the task runs, the
 interface walks those handles through the model and shows what else is downstream:
@@ -133,10 +133,10 @@ Rules for the steps:
   the expected status/body, a screen with what must appear.
 - **Cover the negative case too**, not just the happy path — the invalid input, the
   empty list, the unauthorised call.
-- **Cover what the change could break nearby.** Ask the laboratory what else
+- **Cover what the change could break nearby.** Ask Intelligence what else
   reads or writes the data you touched, and add a step for it.
-- **If the task changes code, add a step for the description itself** — "ask the
-  laboratory to re-read the repository; it then describes the new field / route /
+- **If the task changes code, add a step for the description itself** — "ask
+  Intelligence to re-read the repository; it then describes the new field / route /
   transition, and the handles are unchanged". The model is what every later task is
   briefed from; if it silently lags, every one of them is briefed from fiction.
 - Mark a step `(manual)` when only a human can judge it. The runner will stop and
@@ -150,7 +150,7 @@ Rules for the steps:
   another, order them with the number prefix.
 - **Every task needs a `## Verify` section.** A task with no way to check it is not
   ready to run — a requirement you cannot check is a wish, not a task.
-- Ground the context in what the laboratory says and in the real code — never invent.
+- Ground the context in what Intelligence says and in the real code — never invent.
   Prefer naming things by their handles over pasting large chunks of code.
 - Add standalone `verify` tasks at the points where a whole flow should be re-proven
   (after a group of related build tasks), not after every single one.

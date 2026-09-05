@@ -104,7 +104,7 @@ const READS: ToolAnnotations = {
  *
  * Он считал, влезает ли репозиторий в один проход, и если нет — предлагал ввод
  * по частям. И то и другое имело смысл, пока модель строилась на этой машине.
- * Она строится в лаборатории, и решение «в один проход или по частям» принимают
+ * Она строится в Intelligence, и решение «в один проход или по частям» принимают
  * там, где читают. Здесь оставались только константы и тип: ни одна строка их не
  * звала, а описание инструмента и инструкция агенту продолжали обещать и замер,
  * и поэтапный ввод. Обещание, которого код не выполняет, дороже отсутствующей
@@ -166,9 +166,9 @@ const TOOLS: Tool[] = [
     description:
       'Prepare a project to be worked on with GitMir: put it on the dashboard, create the task ' +
       'queue folders, and say what is still missing — above all whether this machine is ' +
-      'connected to the laboratory, which is where the model of a product is built and kept. ' +
+      'connected to Intelligence, which is where the model of a product is built and kept. ' +
       'Call this the first time you touch a project, or whenever another tool answers "there ' +
-      'is no model here". It also lists what works with no laboratory account at all: the task ' +
+      'is no model here". It also lists what works with no Intelligence account at all: the task ' +
       'queue, findings, and the audits that walk a running application. Creates only folders ' +
       'and a list entry; it never edits code.',
     inputSchema: { type: 'object', properties: { ...PROJECT_ARG }, required: [] },
@@ -188,7 +188,7 @@ const TOOLS: Tool[] = [
 
       /* Модель здесь больше не строится и не хранится.
        *
-       * Она живёт в лаборатории и приходит по MCP — тем же путём, каким её берёт
+       * Она живёт в Intelligence и приходит по MCP — тем же путём, каким её берёт
        * ассистент. Причина не в удобстве: устройство модели — то, чем этот продукт
        * отличается от grep, и держать его на чужом диске значит раздавать его.
        *
@@ -198,15 +198,15 @@ const TOOLS: Tool[] = [
        * работает у него. */
       lines.push('');
       if (labConnected()) {
-        /* «Ключ задан» и «лаборатория ответила» — разные новости.
+        /* «Ключ задан» и «Intelligence ответил» — разные новости.
          *
          * labConnected() отвечает только про ключ (см. lib/lab.js), а ни один
-         * инструмент отсюда в лабораторию пока не ходит. Поэтому здесь не может
+         * инструмент отсюда в Intelligence пока не ходит. Поэтому здесь не может
          * стоять «connected»: человек с опечаткой в ключе прочитал бы, что всё в
          * порядке, и остался бы без единственного экрана, который объясняет, что
-         * делать. И адрес лаборатории называется в обеих ветках — иначе тот, кто
+         * делать. И адрес Intelligence называется в обеих ветках — иначе тот, кто
          * уже подключился, знает, что модель есть, и не знает, куда за ней идти. */
-        lines.push('Laboratory: a key is set (GITMIR_LAB_KEY). Nothing here has asked the laboratory');
+        lines.push('Intelligence: a key is set (GITMIR_LAB_KEY). Nothing here has asked Intelligence');
         lines.push('yet, so this says the key is present, not that it was accepted.');
         lines.push('');
         lines.push(`The model of this product is built and kept there: ask it over MCP at ${lab().mcp}.`);
@@ -215,7 +215,7 @@ const TOOLS: Tool[] = [
         lines.push('Next: gitmir_skill("task-planner") writes tasks that carry their own checks, and');
         lines.push('gitmir_skill("task-log") keeps the record of what was done.');
       } else {
-        lines.push('Laboratory: not connected — and that is where the model of a product lives.');
+        lines.push('Intelligence: not connected — and that is where the model of a product lives.');
         lines.push('');
         lines.push(`Connect it at ${lab().signIn} (sign up at ${lab().signUp}), then open`);
         lines.push(`${lab().keys}, copy the key, and set it as GITMIR_LAB_KEY.`);
@@ -250,7 +250,7 @@ const TOOLS: Tool[] = [
       for (const d of defs) out.push(`${d.name}\n    ${d.description}`);
       out.push('');
       out.push('No model yet? Call gitmir_setup — it says what is missing, and which of these');
-      out.push('procedures work without one. The model itself is built in the laboratory.');
+      out.push('procedures work without one. The model itself is built in Intelligence.');
       return { text: out.join('\n') };
     },
   },
@@ -288,7 +288,7 @@ const TOOLS: Tool[] = [
       'List the work planned for this project — the task files under tasks/ — with the handles ' +
       'each one says it touches and whether it has been approved. Call this when the user asks ' +
       'what is queued, what is being worked on, or what still needs approval before it runs. How ' +
-      'far a task actually reaches is answered by the laboratory, not by this server.',
+      'far a task actually reaches is answered by Intelligence, not by this server.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -297,11 +297,11 @@ const TOOLS: Tool[] = [
       },
     },
     run(args, project) {
-      /* Очередь читается с диска и работает без лаборатории.
+      /* Очередь читается с диска и работает без Intelligence.
        *
        * Раньше рядом с каждой задачей стоял риск, посчитанный по локальной модели.
-       * Считать его здесь больше нечем и незачем: радиус — вопрос к лаборатории,
-       * и она же на него отвечает. Задачи от этого не перестают быть задачами. */
+       * Считать его здесь больше нечем и незачем: радиус — вопрос к Intelligence,
+       * он на него и отвечает. Задачи от этого не перестают быть задачами. */
       /* Пустая очередь и пустая колонка — разные ответы.
        *
        * Проверка на пустоту стоит ДО фильтра: иначе вопрос «что в verify?» при
@@ -320,13 +320,13 @@ const TOOLS: Tool[] = [
       const L: string[] = [];
       /* Оговорка не снимается по факту ключа.
        *
-       * Охват задачи считает лаборатория, и подключение само по себе его сюда не
+       * Охват задачи считает Intelligence, и подключение само по себе его сюда не
        * приносит: ниже как считались `touches` из самого файла задачи, так и
        * считаются. Убрать строку по ключу значило бы сделать ответ не полнее, а
        * менее честным. */
       L.push(labConnected()
-        ? '(the queue is shown; how far each task reaches is answered by the laboratory, not from here)'
-        : '(no laboratory connected — the queue is shown, the reach of each task is not)', '');
+        ? '(the queue is shown; how far each task reaches is answered by Intelligence, not from here)'
+        : '(Intelligence is not connected — the queue is shown, the reach of each task is not)', '');
       for (const t of tasks) {
         const tail = t.ids.length
           ? `  touches ${t.ids.length} part(s) of the product, ${t.declared ? 'declared' : 'inferred'}`
@@ -348,20 +348,20 @@ const TOOLS: Tool[] = [
       'written rules. Call this at the start of a session instead of asking what to do, and after ' +
       'finishing work to see what it left behind. Each item says what it is, why it costs something ' +
       'to ignore, and what closes it. What only the model can see — the code having moved past it, ' +
-      'parts of the product nobody owns — is answered by the laboratory instead.',
+      'parts of the product nobody owns — is answered by Intelligence instead.',
     inputSchema: { type: 'object', properties: { ...PROJECT_ARG } },
     run(_args: Record<string, unknown>, project: string) {
       /* Что требует человека — из того, что видно отсюда.
        *
        * Часть поводов приходила от модели: код ушёл вперёд, ничейные части
-       * продукта. Их теперь знает лаборатория, и они вернутся сюда её ответом,
-       * когда у неё появится чем отвечать. Остальные поводы — задачи без
+       * продукта. Их теперь знает Intelligence, и они вернутся сюда его ответом,
+       * когда у него появится чем отвечать. Остальные поводы — задачи без
        * одобрения, находки, чьи файлы с тех пор менялись — лежат в репозитории и
        * считаются здесь, как считались. */
       const tasks = readTasks(project);
-      /* `exists` — «лаборатория у этой машины есть», а не литерал.
+      /* `exists` — «Intelligence у этой машины есть», а не литерал.
        *
-       * Здесь стояла константа false, и пункт «No laboratory is connected»
+       * Здесь стояла константа false, и пункт «Intelligence is not connected»
        * печатался при выставленном ключе — в одной сессии с gitmir_setup,
        * который тот же ключ видел правильно. Признак берётся из того же
        * единственного места, что и во всём остальном клиенте. */
@@ -392,7 +392,7 @@ const TOOLS: Tool[] = [
       if (!hasLab) {
         L.push('');
         L.push(`Some of what needs a person is only visible from the model — the code having moved past `
-             + `it, parts nobody owns. That lives in the laboratory: ${lab().home}`);
+             + `it, parts nobody owns. That lives in Intelligence: ${lab().home}`);
       }
       return { text: L.join('\n') };
     },
@@ -422,7 +422,7 @@ const TOOLS: Tool[] = [
         actual: { type: 'string', description: 'What the code does instead, naming the function or route you read it from.' },
         consequence: { type: 'string', description: 'What goes wrong for a person because of the gap. This is what makes it arguable.' },
         source: { type: 'string', description: 'Where the rule is written: a spec section, a ticket, a decision. "spec 5.2", "docs/spec.md#pricing".' },
-        touches: { type: 'array', items: { type: 'string' }, description: 'The handles this sits on, as the laboratory issued them — "gm_" and ten characters. This is what makes it visible on the diagrams.' },
+        touches: { type: 'array', items: { type: 'string' }, description: 'The handles this sits on, as Intelligence issued them — "gm_" and ten characters. This is what makes it visible on the diagrams.' },
         kind: { type: 'string', enum: [...KINDS], description: 'contradicts-spec: does something else. not-implemented: does nothing. undefined: the spec never said. risk: works, will not survive production.' },
         severity: { type: 'string', enum: [...SEVERITIES] },
         readFrom: { type: 'array', items: { type: 'string' }, description: 'Repo-relative files you read this from. When one of them changes, the finding asks to be re-checked instead of quietly going stale.' },
@@ -449,7 +449,7 @@ const TOOLS: Tool[] = [
        * Здесь стояло «take the ids from gitmir_navigate» — инструмента с таким
        * именем среди одиннадцати нет, и агент, послушавшийся совета, получал
        * -32602 ровно в тот момент, когда пытался дописать запись правильно. */
-      if (!f.touches.length) L.push('Add `touches` with the handles the laboratory issued ("gm_" and ten characters) to make it visible where it matters.');
+      if (!f.touches.length) L.push('Add `touches` with the handles Intelligence issued ("gm_" and ten characters) to make it visible where it matters.');
       /* Повторная находка на принятом дефекте не возвращается в открытые.
        *
        * writeFinding сохраняет прежний статус, и «It is on the dashboard now»
@@ -558,7 +558,7 @@ const TOOLS: Tool[] = [
       'later. Call this when the user asks to note something down, plan work, or turn a ' +
       'finding into work rather than doing it now. A task must carry the checks that prove ' +
       'it worked — write them as numbered steps a person could follow. Naming the handles ' +
-      'it will change is what lets the laboratory say what else the change would reach.',
+      'it will change is what lets Intelligence say what else the change would reach.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -571,7 +571,7 @@ const TOOLS: Tool[] = [
         },
         touches: {
           type: 'array', items: { type: 'string' },
-          description: 'Handles this task will CHANGE (not the ones it reads), as the laboratory issued them, e.g. ["gm_261dcdf61e","gm_9b4c1a7f30"].',
+          description: 'Handles this task will CHANGE (not the ones it reads), as Intelligence issued them, e.g. ["gm_261dcdf61e","gm_9b4c1a7f30"].',
         },
         context: { type: 'string', description: 'Optional: the slice of the product the runner needs.' },
       },
@@ -592,7 +592,7 @@ const TOOLS: Tool[] = [
         };
       }
 
-      /* `touches` — ручки, выданные лабораторией (`gm_` и десять знаков).
+      /* `touches` — ручки, выданные Intelligence (`gm_` и десять знаков).
        *
        * Проверить их здесь нечем: модели на этой машине нет, а ручка ничего о
        * себе не сообщает — в том и смысл. Поэтому записываем как есть и говорим
@@ -601,7 +601,7 @@ const TOOLS: Tool[] = [
       const touches = Array.isArray(args.touches) ? args.touches.map((x) => String(x).trim()).filter(Boolean) : [];
       const odd = touches.filter((h) => !/^gm_[0-9a-f]{10}$/.test(h));
       const warn = odd.length
-        ? `\n\nNote: these do not look like handles the laboratory issues (gm_ and ten characters) `
+        ? `\n\nNote: these do not look like handles Intelligence issues (gm_ and ten characters) `
           + `and were written down anyway — check them: ${odd.join(', ')}`
         : '';
 
@@ -862,7 +862,7 @@ async function handle(msg: any): Promise<void> {
           'tasks/, the findings recorded against it, approvals, progress for the person watching ' +
           'the dashboard, and the written procedures. It does NOT hold a model of the product — ' +
           'what something is, what depends on it and how far a change would reach are answered by ' +
-          `the laboratory at ${lab().home} over this same protocol, on its own address (${lab().mcp}). ` +
+          `Intelligence at ${lab().home} over this same protocol, on its own address (${lab().mcp}). ` +
           'Do not try to rebuild that here by reading the repository file by file. ' +
           'Start a session with gitmir_attention rather than asking the user what to do; call ' +
           'gitmir_setup the first time you touch a project — it puts it on the dashboard, makes ' +

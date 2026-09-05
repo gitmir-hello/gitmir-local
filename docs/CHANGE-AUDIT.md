@@ -35,9 +35,9 @@ One line per move, appended to `.gitmir/audit/events.jsonl` in your project:
   them: opaque labels that point at something and say nothing else. Written only
   when the task named any, which is what makes the per-object cut possible.
 - `areas` — which area each of those handles belongs to, stamped in at the moment
-  of the move so the record stays readable after the task is deleted. Only the
-  laboratory knows that mapping, so the field is absent — and the per-area cut
-  empty — until one is connected.
+  of the move so the record stays readable after the task is deleted. Only
+  Intelligence knows that mapping, so the field is absent — and the per-area cut
+  empty — until it is connected.
 
 **There is no author field.** No name, no email, no machine, no hostname. The file
 is append-only and never leaves your machine unless you press the button that

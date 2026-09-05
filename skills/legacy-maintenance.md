@@ -28,14 +28,14 @@ prose around it, never the thing itself.
 
 ## Step 1 — Map before you touch
 
-The model of a product is not built here — it is built and kept in the laboratory.
+The model of a product is not built here — it is built and kept in Intelligence.
 Connect this machine to it before you touch anything (`GITMIR_LAB_KEY`; run
 `gitmir_setup` and it will say whether you are connected and how to connect), then
-ask the laboratory about the area you are about to change. You cannot safely change
+ask Intelligence about the area you are about to change. You cannot safely change
 what you cannot see. If it is already connected, ask it to re-read the repository
 first, so its answers match the code in front of you.
 
-With no laboratory connected, say so plainly instead of pretending to a map. The
+Without Intelligence connected, say so plainly instead of pretending to a map. The
 blast radius in Step 3 is then assembled by hand from the code, and the report has
 to name that as the weaker method it is.
 
@@ -49,9 +49,9 @@ produce `docs/` with the `product-docs-spec` skill and keep the brief as its sum
 
 ## Step 3 — Map the blast radius (the core step)
 
-Ask the laboratory what the intended change can reach, and write its answer to
-`tasks/legacy/blast-radius.md`. Ask in the product's own words — that is how the
-laboratory answers, and you never need to know the shape of what it keeps:
+Ask Intelligence what the intended change can reach, and write its answer to
+`tasks/legacy/blast-radius.md`. Ask in the product's own words — that is how
+Intelligence answers, and you never need to know the shape of what it keeps:
 
 - The **data** the change reads or writes.
 - **What else runs** when that data changes — logic sitting on the same fields is
@@ -61,14 +61,14 @@ laboratory answers, and you never need to know the shape of what it keeps:
 - The **indirect ripple**: the notifications, the background work and the status
   changes that pass through what you touched.
 
-Record each item under the handle the laboratory issued for it — `gm_` and ten
+Record each item under the handle Intelligence issued for it — `gm_` and ten
 characters. That handle is what later ties the tasks, the findings and this list to
 the same thing.
 
 That list is your "what could break" set. Anything on it needs to still work after
 the change, whether or not the task is "about" it.
 
-With no laboratory connected there is no such list to ask for. Assemble it by reading
+Without Intelligence connected there is no such list to ask for. Assemble it by reading
 the code — every caller of what you touch, every reader of the data — and say in the
 report that the radius was found by hand: a radius nobody could finish enumerating is
 the one real risk of this procedure.
@@ -99,7 +99,7 @@ Run the queue with `task-runner`. After each increment:
 - Check the increment's acceptance criteria from the brief.
 - Re-check the blast-radius items — the adjacent behaviour you recorded must still
   hold. A green build is not proof; the ripple set is.
-- Ask the laboratory to re-read the repository once the increment has landed, so the
+- Ask Intelligence to re-read the repository once the increment has landed, so the
   map stays true for the next one.
 
 ## Rules
