@@ -107,6 +107,17 @@ what depends on what, and what a change would reach are answered by Intelligence
 its own MCP endpoint — see [lab.gitmir.com](https://lab.gitmir.com). Every answer from
 there states how fresh the model is, because in an editor there is no banner to show it.
 
+`gitmir lab add --project <id>` registers that endpoint as
+`"https://lab.gitmir.com/mcp?project=<id>"`, so the connection starts in that project, and
+it does so at Claude Code's `local` scope rather than `user`: the entry belongs to the
+folder you ran the command in, lives in Claude Code's own config outside the repository —
+no file you could commit holds the key — and in that folder it wins over a `gitmir-lab`
+added for every project. Starting in a project is a default, not a wider door: a question
+that names another project still reaches only what the key reads. If you register it by
+hand, keep the address in quotes; zsh reads an unquoted `?` as a filename pattern and
+answers `no matches found` without running anything. `gitmir lab add-here --project <id>`
+writes the same address into `.mcp.json` instead, with the key left as `${GITMIR_LAB_KEY}`.
+
 ## Setting a project up without doing it by hand
 
 Connect the server, then tell your agent *set this project up with GitMir*. It

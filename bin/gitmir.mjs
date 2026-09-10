@@ -512,8 +512,28 @@ function check(arg) {
  * Ключ сюда попадает один раз и ложится в домашнюю папку, а не в репозиторий:
  * он даёт право читать модель продукта, а репозитории коммитят и показывают.
  */
-async function labCmd(sub, flag) {
+async function labCmd(argv) {
   const L = await import(path.join(DIR, 'lib', 'lab.js'));
+
+  /* --project разбирается первым и проверяется раньше всего остального: неверный
+   * id — отказ до того, как что-то сохранено или прописано у ассистента. */
+  const rest = [];
+  let project = null;
+  for (let i = 0; i < argv.length; i++) {
+    const a = String(argv[i]);
+    if (a === '--project') { project = argv[++i] ?? ''; continue; }
+    if (a.startsWith('--project=')) { project = a.slice('--project='.length); continue; }
+    rest.push(a);
+  }
+  const sub = rest[0];
+  let address = null;
+  if (project !== null) {
+    if (sub !== 'add' && sub !== 'add-here') {
+      die('--project goes with `gitmir lab add` or `gitmir lab add-here`.');
+    }
+    try { address = L.lab().mcpFor(project); }
+    catch (e) { die(`${String(e.message || e)}\n    \`gitmir lab\` lists the projects your key reads.`); }
+  }
 
   if (sub === 'forget') {
     say(L.forget() ? 'Key removed. Everything that does not need a model keeps working.'
@@ -570,14 +590,30 @@ async function labCmd(sub, flag) {
    * регистрация обслуживает все проекты: у инструментов Intelligence есть
    * аргумент проекта, и спрашивают они про тот, что назовут.
    *
+   * С `--project` — локальная область: запись принадлежит этой папке, лежит в
+   * конфиге Claude Code вне репозитория и здесь важнее общей записи с тем же
+   * именем. Область пишется явно: на умолчание CLI полагаться нельзя — сменись
+   * оно, привязка к папке тихо стала бы регистрацией везде.
+   *
    * `--here` оставлен для тех, кому нужна привязка к папке, и туда пишется не
    * ключ, а ссылка на переменную окружения — секрет в репозиторий не попадает
    * ни в каком случае. */
   const here = sub === 'add-here';
-  const scope = here ? 'project' : 'user';
+  const scope = here ? 'project' : address ? 'local' : 'user';
+  const url = address || L.lab().mcp;
   const header = here ? 'Authorization: Bearer ${GITMIR_LAB_KEY}' : `Authorization: Bearer ${key}`;
+  const again = `gitmir lab ${sub}${address ? ' --project ' + project : ''}`;
   const args = ['mcp', 'add', '-s', scope, 'gitmir-lab', '--transport', 'http',
-                L.lab().mcp, '--header', header];
+                url, '--header', header];
+
+  /* Адрес задаёт только проект по умолчанию; что можно читать, решает ключ.
+   * Сказать это сразу — иначе адрес с проектом выглядит как пропуск в него. */
+  const startsIn = () => {
+    if (!address) return;
+    say(`The connection starts in ${c('0;36', project)}: a question that names no project is about it.`);
+    say('Naming another project still reaches only what this key reads.');
+  };
+
   try {
     console.log(runClaude(args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim());
   } catch (e) {
@@ -586,14 +622,25 @@ async function labCmd(sub, flag) {
       console.log('');
       say("The 'claude' CLI is not on your PATH. Register it by hand — this is the whole thing:");
       console.log('');
-      console.log(`    claude mcp add -s ${scope} gitmir-lab --transport http ${L.lab().mcp} \\`);
-      console.log(`      --header "${header}"`);
+      /* Одной строкой и с адресом в кавычках: zsh читает `?` без кавычек как
+       * шаблон имён файлов и отвечает «no matches found», не запустив команду.
+       * Ссылка на переменную — в одинарных: в двойных оболочка подставит сам
+       * ключ, и он уедет в `.mcp.json`, который коммитят. */
+      const quoted = here ? `'${header}'` : `"${header}"`;
+      console.log(`    claude mcp add -s ${scope} gitmir-lab --transport http "${url}" --header ${quoted}`);
       console.log('');
+      if (address) {
+        say(here ? `It goes into .mcp.json in ${process.cwd()}.` : `It is for this folder only: ${process.cwd()}`);
+        startsIn();
+        console.log('');
+      }
       return;
     }
     if (/already exists/i.test(said)) {
-      say(`${c('0;36', 'Already registered')} — gitmir-lab is in your ${scope} config.`);
-      say(`To replace it:  claude mcp remove -s ${scope} gitmir-lab && gitmir lab ${sub}`);
+      say(`${c('0;36', 'Already registered')} — gitmir-lab is in your ${scope} config${scope === 'local' ? ' for this folder' : ''}.`);
+      /* С областью: без неё CLI сам выбирает, откуда удалять, а при --project
+       * рядом часто лежит общая запись с тем же именем — удалить надо эту. */
+      say(`To replace it:  ${c('0;36', `claude mcp remove gitmir-lab -s ${scope}`)}, then run ${c('0;36', again)} again.`);
       console.log('');
       return;
     }
@@ -622,8 +669,15 @@ async function labCmd(sub, flag) {
     console.log('');
     console.log(`    export GITMIR_LAB_KEY=${key.slice(0, 8)}…`);
     console.log('');
-    say(`Nothing to set up if you drop the ${c('0;36', '--here')}: ${c('0;36', 'gitmir lab add')} carries the key itself,`);
+    say(`Nothing to set up if you drop the ${c('0;36', '--here')}: ${c('0;36', address ? 'gitmir lab add --project ' + project : 'gitmir lab add')} carries the key itself,`);
     say('in your own config, outside every repository.');
+    if (address) { console.log(''); startsIn(); }
+  } else if (address) {
+    say(`Added for this folder only: ${process.cwd()}`);
+    say('Claude Code keeps it in its own config, outside this repository, so no file here holds the key.');
+    say('In this folder it wins over a gitmir-lab added for every project; everywhere else that one still answers.');
+    console.log('');
+    startsIn();
   } else {
     say('Added for every project. Ask it about one by name — it knows:');
     say(`  ${products.join(', ') || '(nothing yet)'}`);
@@ -696,6 +750,8 @@ const HELP = `
     gitmir lab          is Intelligence connected, and what can it read
     gitmir lab <key>    save the key from lab.gitmir.com/account/access
     gitmir lab add      let your assistant ask Intelligence directly
+    gitmir lab add --project <id>
+                        start from that project, in this folder only
     gitmir lab add-here pin that to this folder (.mcp.json, key kept out of it)
     gitmir lab forget   remove the saved key
     gitmir log [n]      the last n lines the server printed
@@ -713,7 +769,8 @@ switch (cmd) {
   case 'update': await update(); break;
   case 'mcp': mcp(arg, flag); break;
   case 'check': check(arg); break;
-  case 'lab': await labCmd(arg, flag); break;
+  // Весь хвост, а не два слова: у `--project` есть значение, и оно третье.
+  case 'lab': await labCmd(process.argv.slice(3)); break;
   case 'path': console.log(DIR); break;
   case 'log':
     try { console.log(fs.readFileSync(LOG, 'utf8').split('\n').slice(-(Number(arg) || 40)).join('\n')); }
