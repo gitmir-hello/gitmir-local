@@ -228,6 +228,13 @@ it is stored. To pin the registration to one repository rather than your whole a
 `gitmir lab add-here` writes `.mcp.json` that reads the key from `GITMIR_LAB_KEY` instead
 of carrying it, so that file is safe to commit.
 
+Two keys can live on this machine. An **agent key** is made on a project or repository and
+reads only that place; your assistant uses it. `gitmir lab add --project <id> --key <agent key>`
+saves it and registers it for this folder. Your **personal key**, the one `gitmir lab <key>`
+saves, is the one the Local Connector uses, because uploads do not accept an agent key. Until
+you save an agent key, your assistant uses the personal key as well. `gitmir lab status` lists
+both by their last four characters and says what uses each.
+
 Then ask your agent these five questions:
 
 1. What are the main business objects in this product?

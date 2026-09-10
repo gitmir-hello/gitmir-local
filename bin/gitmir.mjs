@@ -501,6 +501,38 @@ function check(arg) {
  * Intelligence: ключ и подключение по MCP
  * ------------------------------------------------------------------------ */
 
+/* Ключи этой машины для `gitmir lab status`: последние четыре знака и кто каким
+ * пользуется. Самого ключа здесь нет — терминалы попадают в скриншоты. */
+function keysStatus(L) {
+  const list = L.keys();
+  const file = path.join(STATE, 'lab.json');
+  console.log('');
+  const wanted = (process.env.GITMIR_LAB_URL || '').trim();
+  if (wanted) {
+    let origin = '';
+    try { origin = new URL(wanted).origin; } catch {}
+    // Адрес, который не прошёл правило, не берётся; сказать об этом здесь, а не по «bad key».
+    say(origin === L.lab().home ? `Intelligence at ${L.lab().home} (GITMIR_LAB_URL)`
+      : `${c('0;33', 'GITMIR_LAB_URL is not used')}: it must be https, or http only on 127.0.0.1. Intelligence at ${L.lab().home}`);
+  }
+  if (!list.length) return;
+  say('Keys on this machine, by their last four characters:');
+  const usedBy = (u) => u.length === 2 ? 'assistants (/mcp and /view) and the Local Connector'
+    : u[0] === 'assistants' ? 'assistants (/mcp and /view)'
+    : u[0] === 'connector' ? 'the Local Connector'
+    : 'nothing: the environment variable wins';
+  for (const k of list) {
+    const what = (k.kind === 'agent' ? 'agent key' : 'personal key')
+      + (k.source === 'environment' ? `, from ${k.name}` : `, saved in ${file}`);
+    say(`  …${k.last4}  ${what}  →  ${usedBy(k.uses)}`);
+  }
+  if (!list.some((k) => k.kind === 'personal')) say(L.PERSONAL_KEY_NEEDED);
+  else if (!list.some((k) => k.kind === 'agent')) {
+    say('Assistants use your personal key. An agent key is made on a project or repository and reads only that place:');
+    say(`  ${c('0;36', 'gitmir lab add --project <id> --key <agent key>')}`);
+  }
+}
+
 /**
  * Подключить эту машину к Intelligence и прописать его ассистенту.
  *
@@ -519,10 +551,13 @@ async function labCmd(argv) {
    * id — отказ до того, как что-то сохранено или прописано у ассистента. */
   const rest = [];
   let project = null;
+  let agentKey = null;
   for (let i = 0; i < argv.length; i++) {
     const a = String(argv[i]);
     if (a === '--project') { project = argv[++i] ?? ''; continue; }
     if (a.startsWith('--project=')) { project = a.slice('--project='.length); continue; }
+    if (a === '--key') { agentKey = argv[++i] ?? ''; continue; }
+    if (a.startsWith('--key=')) { agentKey = a.slice('--key='.length); continue; }
     rest.push(a);
   }
   const sub = rest[0];
@@ -534,9 +569,15 @@ async function labCmd(argv) {
     try { address = L.lab().mcpFor(project); }
     catch (e) { die(`${String(e.message || e)}\n    \`gitmir lab\` lists the projects your key reads.`); }
   }
+  /* Ключ агента делают на проекте или репозитории, и читает он только это место:
+   * без --project ему не к чему относиться. Личный ключ сохраняет `gitmir lab <key>`. */
+  if (agentKey !== null && project === null) {
+    die('--key goes with --project: an agent key is made on a project or repository.\n'
+      + '    Your personal key is saved with `gitmir lab <key>`.');
+  }
 
   if (sub === 'forget') {
-    say(L.forget() ? 'Key removed. Everything that does not need a model keeps working.'
+    say(L.forget() ? 'Saved keys removed, the personal key and the agent key. Everything that does not need a model keeps working.'
                    : 'There was no saved key.');
     return;
   }
@@ -544,11 +585,20 @@ async function labCmd(argv) {
   /* Ключ приходит либо аргументом, либо уже сохранён. Печатать его обратно на
    * экран нельзя: терминалы попадают в скриншоты и в записи демонстраций. */
   if (sub && sub !== 'add' && sub !== 'add-here' && sub !== 'status') {
-    try { const f = L.remember(sub); say(`Key saved in ${f}`); }
+    try { const f = L.remember(sub); say(`Personal key saved in ${f}`); }
+    catch (e) { die(String(e.message || e)); }
+  }
+  // Ключ агента ложится до регистрации: и проверка связи, и заголовок идут уже с ним.
+  if (agentKey !== null) {
+    try { const f = L.remember(agentKey, { agent: true }); say(`Agent key saved in ${f}`); }
     catch (e) { die(String(e.message || e)); }
   }
 
-  const key = L.key();
+  if (sub === 'status') keysStatus(L);
+
+  /* Проверка связи и регистрация у ассистента идут с ключом агента, а пока его
+   * нет — с личным, как раньше. */
+  const key = L.agentKey();
   if (!key) {
     console.log('');
     say(`${c('0;36', 'Not connected.')} The model of a product is built and kept in Intelligence.`);
@@ -601,7 +651,12 @@ async function labCmd(argv) {
   const here = sub === 'add-here';
   const scope = here ? 'project' : address ? 'local' : 'user';
   const url = address || L.lab().mcp;
-  const header = here ? 'Authorization: Bearer ${GITMIR_LAB_KEY}' : `Authorization: Bearer ${key}`;
+  /* В .mcp.json с --project — ссылка на ключ агента: файл коммитят, и у каждого,
+   * кто его откроет, свой ключ, сделанный на этом проекте. Без --project — как раньше. */
+  const envName = here && address ? 'GITMIR_LAB_AGENT_KEY' : 'GITMIR_LAB_KEY';
+  const header = here ? 'Authorization: Bearer ${' + envName + '}' : `Authorization: Bearer ${key}`;
+  // На экран — только хвост ключа: ручную строку печатают, а терминалы попадают в скриншоты.
+  const shown = here ? header : `Authorization: Bearer <your key, ending ${key.slice(-4)}>`;
   const again = `gitmir lab ${sub}${address ? ' --project ' + project : ''}`;
   const args = ['mcp', 'add', '-s', scope, 'gitmir-lab', '--transport', 'http',
                 url, '--header', header];
@@ -613,6 +668,13 @@ async function labCmd(argv) {
     say(`The connection starts in ${c('0;36', project)}: a question that names no project is about it.`);
     say('Naming another project still reaches only what this key reads.');
   };
+
+  // С --project и без ключа агента регистрируется личный ключ — сказать, чем его заменить.
+  if (address && !here && L.keySource()?.key === 'personal') {
+    say(`This registers your personal key. An agent key is made on ${project} and reads only that place:`);
+    say(`  ${c('0;36', `gitmir lab add --project ${project} --key <agent key>`)}`);
+    console.log('');
+  }
 
   try {
     console.log(runClaude(args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim());
@@ -626,9 +688,13 @@ async function labCmd(argv) {
        * шаблон имён файлов и отвечает «no matches found», не запустив команду.
        * Ссылка на переменную — в одинарных: в двойных оболочка подставит сам
        * ключ, и он уедет в `.mcp.json`, который коммитят. */
-      const quoted = here ? `'${header}'` : `"${header}"`;
+      const quoted = here ? `'${shown}'` : `"${shown}"`;
       console.log(`    claude mcp add -s ${scope} gitmir-lab --transport http "${url}" --header ${quoted}`);
       console.log('');
+      if (!here) {
+        say('Put the whole key in place of <…>. It is not printed here: terminals end up in screenshots.');
+        console.log('');
+      }
       if (address) {
         say(here ? `It goes into .mcp.json in ${process.cwd()}.` : `It is for this folder only: ${process.cwd()}`);
         startsIn();
@@ -649,25 +715,27 @@ async function labCmd(argv) {
   console.log('');
   if (here) {
     say(`Written into .mcp.json in ${process.cwd()}`);
-    say(`${c('0;32', 'The key is not in that file')} — it reads GITMIR_LAB_KEY from the environment,`);
+    say(`${c('0;32', 'The key is not in that file')} — it reads ${envName} from the environment,`);
     say('so the file is safe to commit.');
     console.log('');
     /* И сразу же — единственная ловушка этого пути.
      *
      * Незаданная переменная не ломает загрузку конфигурации: подставляется
-     * буквальная строка `${GITMIR_LAB_KEY}`, и она уезжает в заголовке как
-     * ключ. Intelligence отвечает «неверный ключ», и человек идёт проверять
-     * ключ — тот самый, который у него верный. Сказать об этом надо здесь, а не
-     * оставить выяснять по симптому. */
-    if ((process.env.GITMIR_LAB_KEY || '').trim()) {
-      say(`${c('0;32', 'GITMIR_LAB_KEY is set in this shell')} — but your editor is a different one.`);
+     * буквальная строка `${GITMIR_LAB_KEY}` (или `${GITMIR_LAB_AGENT_KEY}`), и она
+     * уезжает в заголовке как ключ. Intelligence отвечает «неверный ключ», и
+     * человек идёт проверять ключ — тот самый, который у него верный. Сказать об
+     * этом надо здесь, а не оставить выяснять по симптому. */
+    if ((process.env[envName] || '').trim()) {
+      say(`${c('0;32', envName + ' is set in this shell')} — but your editor is a different one.`);
     } else {
-      say(`${c('0;33', 'GITMIR_LAB_KEY is not set here.')} Until it is, the request goes out with the`);
+      say(`${c('0;33', envName + ' is not set here.')} Until it is, the request goes out with the`);
       say('placeholder instead of a key, and Intelligence answers "bad key" about a key you have.');
     }
     say('Put this where your editor will see it (your shell profile, or the editor\'s own env):');
     console.log('');
-    console.log(`    export GITMIR_LAB_KEY=${key.slice(0, 8)}…`);
+    // Только хвост ключа: целиком он на экран не попадает.
+    const forVar = envName === 'GITMIR_LAB_KEY' ? (L.key() || key) : key;
+    console.log(`    export ${envName}=<your key, ending ${forVar.slice(-4)}>`);
     console.log('');
     say(`Nothing to set up if you drop the ${c('0;36', '--here')}: ${c('0;36', address ? 'gitmir lab add --project ' + project : 'gitmir lab add')} carries the key itself,`);
     say('in your own config, outside every repository.');
@@ -718,10 +786,12 @@ async function doctor() {
    * подключился командой минуту назад. */
   {
     const L = await import(path.join(DIR, 'lib', 'lab.js'));
+    // keySource() — ключ, с которым ходят ассистенты: ключ агента или личный.
     const src = L.keySource();
-    row('Intelligence', src === 'environment' ? 'connected (key from GITMIR_LAB_KEY)'
-      : src === 'saved' ? `connected (key saved in ${STATE})`
-      : c('1;33', 'not connected — run `gitmir lab` to connect'));
+    const which = src && src.key === 'agent' ? 'agent key' : 'key';
+    row('Intelligence', !src ? c('1;33', 'not connected — run `gitmir lab` to connect')
+      : src.source === 'environment' ? `connected (${which} from ${src.name})`
+      : `connected (${which} saved in ${STATE})`);
   }
   row(`port ${PORT}`, (await listening()) ? 'serving' : 'not running');
   row('version', ver);
@@ -748,12 +818,14 @@ const HELP = `
     gitmir check [dir]  set a project up, and print what is still missing (writes)
 
     gitmir lab          is Intelligence connected, and what can it read
-    gitmir lab <key>    save the key from lab.gitmir.com/account/access
+    gitmir lab status   the keys on this machine, by their last four, and what uses each
+    gitmir lab <key>    save your personal key from lab.gitmir.com/account/access
     gitmir lab add      let your assistant ask Intelligence directly
-    gitmir lab add --project <id>
-                        start from that project, in this folder only
+    gitmir lab add --project <id> [--key <agent key>]
+                        start from that project, in this folder only;
+                        --key saves the agent key made on it first
     gitmir lab add-here pin that to this folder (.mcp.json, key kept out of it)
-    gitmir lab forget   remove the saved key
+    gitmir lab forget   remove both saved keys
     gitmir log [n]      the last n lines the server printed
     gitmir path         where the checkout lives
 

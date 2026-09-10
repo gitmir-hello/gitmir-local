@@ -38,10 +38,12 @@ is set in the environment the tool starts in:
 
 2. **Intelligence — questions out, answers back.** `lib/lab.js` reads a
    projection for the viewer (`GET https://lab.gitmir.com/view/...`) and asks
-   questions over MCP (`POST https://lab.gitmir.com/mcp`), both with your key as
-   a bearer token. What goes out is the question: handles, names, the business
-   words you would say out loud in a stand-up. What comes back is the answer.
-   Neither carries a line of your code.
+   questions over MCP (`POST https://lab.gitmir.com/mcp`), both with a key as a
+   bearer token: the agent key if one is saved, otherwise your personal key.
+   `GITMIR_LAB_URL` points both at another Intelligence, and is taken only as
+   https, or as plain http on 127.0.0.1. What goes out is the question: handles,
+   names, the business words you would say out loud in a stand-up. What comes
+   back is the answer. Neither carries a line of your code.
    With no key, `connected()` answers from the environment variable and
    deliberately does not probe the network — so an unset key opens no socket even
    to find out.
@@ -50,9 +52,10 @@ is set in the environment the tool starts in:
    source that may not leave the building: it reads the repository on this
    machine and sends the reading, not the repository. The download is checked
    against the SHA-256 Intelligence names separately and is discarded if it
-   does not match, and your key is sent only to the origin Intelligence itself
-   is served from — if it points the download anywhere else, nothing is fetched
-   and the key is not sent there.
+   does not match. It is fetched and run with your personal key, never the agent
+   key, and that key is sent only to the origin Intelligence itself is served
+   from — if it points the download anywhere else, nothing is fetched and the
+   key is not sent there.
 
 **Only when you press the button**
 

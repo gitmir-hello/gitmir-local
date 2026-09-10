@@ -116,7 +116,18 @@ added for every project. Starting in a project is a default, not a wider door: a
 that names another project still reaches only what the key reads. If you register it by
 hand, keep the address in quotes; zsh reads an unquoted `?` as a filename pattern and
 answers `no matches found` without running anything. `gitmir lab add-here --project <id>`
-writes the same address into `.mcp.json` instead, with the key left as `${GITMIR_LAB_KEY}`.
+writes the same address into `.mcp.json` instead, with the key left as `${GITMIR_LAB_AGENT_KEY}`.
+
+This machine keeps two keys, both in `~/.gitmir/lab.json`, readable by you only. An **agent
+key** is made on a project or repository in Intelligence and reads only that place; your
+assistants use it, for `/mcp` and for the drawings the dashboard reads from `/view`.
+`gitmir lab add --project <id> --key <agent key>` saves it before registering, `add-here`
+takes `--key` the same way, and `GITMIR_LAB_AGENT_KEY` in the environment wins over the
+saved one. Your **personal key**, the one `gitmir lab <key>` saves, is the one the Local
+Connector uses, and an agent key cannot stand in for it: uploads do not accept agent keys.
+Until an agent key is saved, assistants use the personal key too, so a machine set up
+earlier keeps working. `gitmir lab status` shows each key by its last four characters,
+never the key itself, and says what uses it.
 
 ## Setting a project up without doing it by hand
 
