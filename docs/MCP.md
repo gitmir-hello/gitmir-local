@@ -107,6 +107,18 @@ what depends on what, and what a change would reach are answered by Intelligence
 its own MCP endpoint — see [lab.gitmir.com](https://lab.gitmir.com). Every answer from
 there states how fresh the model is, because in an editor there is no banner to show it.
 
+The key for that endpoint is made inside a project or repository: open it on
+lab.gitmir.com and press **Connect an AI agent**.
+[lab.gitmir.com/account/access](https://lab.gitmir.com/account/access) lists the projects and
+repositories you can connect an agent to. The key is shown once, so copy it then, and it
+reads only that place. The page gives the line for this machine:
+
+```bash
+gitmir lab add --project <id> --key <agent key>
+# the same registration by hand, with the address in quotes:
+claude mcp add -s local gitmir-lab --transport http "https://lab.gitmir.com/mcp?project=<id>" --header "Authorization: Bearer <agent key>"
+```
+
 `gitmir lab add --project <id>` registers that endpoint as
 `"https://lab.gitmir.com/mcp?project=<id>"`, so the connection starts in that project, and
 it does so at Claude Code's `local` scope rather than `user`: the entry belongs to the
@@ -118,16 +130,17 @@ hand, keep the address in quotes; zsh reads an unquoted `?` as a filename patter
 answers `no matches found` without running anything. `gitmir lab add-here --project <id>`
 writes the same address into `.mcp.json` instead, with the key left as `${GITMIR_LAB_AGENT_KEY}`.
 
-This machine keeps two keys, both in `~/.gitmir/lab.json`, readable by you only. An **agent
-key** is made on a project or repository in Intelligence and reads only that place; your
-assistants use it, for `/mcp` and for the drawings the dashboard reads from `/view`.
-`gitmir lab add --project <id> --key <agent key>` saves it before registering, `add-here`
-takes `--key` the same way, and `GITMIR_LAB_AGENT_KEY` in the environment wins over the
-saved one. Your **personal key**, the one `gitmir lab <key>` saves, is the one the Local
-Connector uses, and an agent key cannot stand in for it: uploads do not accept agent keys.
-Until an agent key is saved, assistants use the personal key too, so a machine set up
-earlier keeps working. `gitmir lab status` shows each key by its last four characters,
-never the key itself, and says what uses it.
+This machine keeps two keys, both in `~/.gitmir/lab.json`, readable by you only. The **agent
+key** is the one Connect an AI agent made; your assistants use it, for `/mcp` and for the
+drawings the dashboard reads from `/view`. `gitmir lab add --project <id> --key <agent key>`
+saves it before registering, `add-here` takes `--key` the same way, and
+`GITMIR_LAB_AGENT_KEY` in the environment wins over the saved one. Your **personal key** is
+on [your account page](https://lab.gitmir.com/account/me) and `gitmir lab <key>` saves it. The
+Local Connector uses it, and an agent key cannot stand in for it: uploads do not accept agent
+keys. Until an agent key is saved, assistants use the personal key too, so a machine set up
+earlier keeps working until older personal keys stop working on `/mcp`, on the date shown in
+the cabinet. `gitmir lab status` shows each key by its last four characters, never the key
+itself, and says what uses it.
 
 ## Setting a project up without doing it by hand
 

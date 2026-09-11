@@ -214,26 +214,40 @@ of them still planned.
 
 ## Five minutes on your own repository
 
-Connect Intelligence — sign in at [lab.gitmir.com](https://lab.gitmir.com), copy your key
-from [your account](https://lab.gitmir.com/account/access), and hand it over once:
+Connect Intelligence. Sign in at [lab.gitmir.com](https://lab.gitmir.com), open the project
+or repository your assistant will work on, and press **Connect an AI agent**. The key it makes
+is shown once, so copy it then, and it reads only that place. Not sure where to start?
+[lab.gitmir.com/account/access](https://lab.gitmir.com/account/access) lists the projects and
+repositories you can connect an agent to, and leads to the same button.
+
+Hand the key over once, from the folder your assistant works in. The page prints this line
+for you under **GitMir on this machine**:
 
 ```
-gitmir lab ctx_your_key_here     # saved on this machine only, never in a repository
-gitmir lab add                   # let your assistant ask Intelligence directly
+gitmir lab add --project <id> --key <agent key>   # saved on this machine only, never in a repository
 ```
 
-`gitmir lab` on its own says whether you are connected and which products it can read.
-You can paste the key on the Model tab of the dashboard instead — same thing, same place
-it is stored. To pin the registration to one repository rather than your whole account,
-`gitmir lab add-here` writes `.mcp.json` that reads the key from `GITMIR_LAB_KEY` instead
-of carrying it, so that file is safe to commit.
+That saves the key and registers Intelligence with Claude Code at `local` scope: for this
+folder only, kept in Claude Code's own config outside the repository. Without the `claude`
+CLI on your PATH it prints the same registration to run by hand, with the address in quotes,
+because zsh reads an unquoted `?` as a filename pattern:
 
-Two keys can live on this machine. An **agent key** is made on a project or repository and
-reads only that place; your assistant uses it. `gitmir lab add --project <id> --key <agent key>`
-saves it and registers it for this folder. Your **personal key**, the one `gitmir lab <key>`
-saves, is the one the Local Connector uses, because uploads do not accept an agent key. Until
-you save an agent key, your assistant uses the personal key as well. `gitmir lab status` lists
-both by their last four characters and says what uses each.
+```
+claude mcp add -s local gitmir-lab --transport http "https://lab.gitmir.com/mcp?project=<id>" --header "Authorization: Bearer <agent key>"
+```
+
+`gitmir lab` on its own says whether you are connected and which products it can read. To
+put the registration in the repository instead, `gitmir lab add-here --project <id>` writes
+`.mcp.json` that reads the key from `GITMIR_LAB_AGENT_KEY` instead of carrying it, so that
+file is safe to commit.
+
+Two keys can live on this machine. The **agent key** above is your assistant's. Your
+**personal key** is on [your account page](https://lab.gitmir.com/account/me); `gitmir lab <key>`
+saves it, and so does pasting a key on the Model tab of the dashboard. The Local Connector
+uses it, because uploads do not accept an agent key. Until you save an agent key, your
+assistant uses the personal key as well, and older personal keys stop working on `/mcp` on
+the date shown in the cabinet. `gitmir lab status` lists both keys by their last four
+characters and says what uses each.
 
 Then ask your agent these five questions:
 

@@ -501,9 +501,13 @@ function check(arg) {
  * Intelligence: ключ и подключение по MCP
  * ------------------------------------------------------------------------ */
 
+/* Где берут ключ агента — одна фраза на все подсказки `gitmir lab`. Кабинет делает его
+ * только изнутри проекта или репозитория; хост — от lab(), чтобы стенд называл себя. */
+const agentKeyWhere = (L) => `use a key made for that project or repository: open it on ${new URL(L.lab().home).host} and press Connect an AI agent`;
+
 /* Ключи этой машины для `gitmir lab status`: последние четыре знака и кто каким
  * пользуется. Самого ключа здесь нет — терминалы попадают в скриншоты. */
-function keysStatus(L) {
+async function keysStatus(L) {
   const list = L.keys();
   const file = path.join(STATE, 'lab.json');
   console.log('');
@@ -526,9 +530,12 @@ function keysStatus(L) {
       + (k.source === 'environment' ? `, from ${k.name}` : `, saved in ${file}`);
     say(`  …${k.last4}  ${what}  →  ${usedBy(k.uses)}`);
   }
-  if (!list.some((k) => k.kind === 'personal')) say(L.PERSONAL_KEY_NEEDED);
-  else if (!list.some((k) => k.kind === 'agent')) {
-    say('Assistants use your personal key. An agent key is made on a project or repository and reads only that place:');
+  if (!list.some((k) => k.kind === 'personal')) {
+    // Та же фраза, что у коннектора, и с адресом /account/me: там теперь личный ключ.
+    const C = await import(path.join(DIR, 'lib', 'connector.js'));
+    say(C.personalKeyNeeded());
+  } else if (!list.some((k) => k.kind === 'agent')) {
+    say('Assistants use your personal key. For each one, ' + agentKeyWhere(L) + ':');
     say(`  ${c('0;36', 'gitmir lab add --project <id> --key <agent key>')}`);
   }
 }
@@ -572,8 +579,8 @@ async function labCmd(argv) {
   /* Ключ агента делают на проекте или репозитории, и читает он только это место:
    * без --project ему не к чему относиться. Личный ключ сохраняет `gitmir lab <key>`. */
   if (agentKey !== null && project === null) {
-    die('--key goes with --project: an agent key is made on a project or repository.\n'
-      + '    Your personal key is saved with `gitmir lab <key>`.');
+    die('--key goes with --project: an agent key is made inside a project or repository and reads only that place.\n'
+      + `    Your personal key, from ${L.lab().home}/account/me, is saved with \`gitmir lab <key>\`.`);
   }
 
   if (sub === 'forget') {
@@ -594,18 +601,24 @@ async function labCmd(argv) {
     catch (e) { die(String(e.message || e)); }
   }
 
-  if (sub === 'status') keysStatus(L);
+  if (sub === 'status') await keysStatus(L);
 
   /* Проверка связи и регистрация у ассистента идут с ключом агента, а пока его
    * нет — с личным, как раньше. */
   const key = L.agentKey();
   if (!key) {
+    /* /account/access больше не показывает ключ: он выбирает место, и ключ агента
+     * делается там. Личный ключ для Local Connector — на /account/me. */
     console.log('');
     say(`${c('0;36', 'Not connected.')} The model of a product is built and kept in Intelligence.`);
     console.log('');
     say(`  1. Sign in at ${c('0;36', L.lab().signIn)}  (or sign up: ${L.lab().signUp})`);
-    say(`  2. Open ${c('0;36', L.lab().keys)} and copy your key`);
-    say(`  3. Run: ${c('0;36', 'gitmir lab ctx_your_key_here')}`);
+    say(`  2. Open the project or repository your assistant works on and press ${c('0;36', 'Connect an AI agent')}`);
+    say(`     (${L.lab().keys} lists them). The key is shown once and reads only that place.`);
+    say(`  3. Run: ${c('0;36', `gitmir lab add --project ${project || '<id>'} --key <agent key>`)}`);
+    console.log('');
+    say(`The Local Connector uses your personal key instead. It is on ${c('0;36', L.lab().home + '/account/me')}`);
+    say(`  and ${c('0;36', 'gitmir lab <personal key>')} saves it.`);
     console.log('');
     say('Everything that does not need a model works without any of this:');
     say('  the task queue, findings, and the audits that walk a running app.');
@@ -628,7 +641,10 @@ async function labCmd(argv) {
 
   if (sub !== 'add' && sub !== 'add-here') {
     console.log('');
-    say(`To let your assistant ask it directly: ${c('0;36', 'gitmir lab add')}`);
+    say(`To let your assistant ask it directly: ${c('0;36', 'gitmir lab add --project <id> --key <agent key>')}`);
+    say(`  ${agentKeyWhere(L)}.`);
+    // status уже назвал /account/me, если личного ключа нет; второй раз — шум.
+    if (sub !== 'status') say(`The Local Connector's personal key is on ${c('0;36', L.lab().home + '/account/me')}`);
     console.log('');
     return;
   }
@@ -669,10 +685,20 @@ async function labCmd(argv) {
     say('Naming another project still reaches only what this key reads.');
   };
 
-  // С --project и без ключа агента регистрируется личный ключ — сказать, чем его заменить.
-  if (address && !here && L.keySource()?.key === 'personal') {
-    say(`This registers your personal key. An agent key is made on ${project} and reads only that place:`);
+  /* С --project, но без --key регистрируется ключ, сделанный не для этого места (личный)
+   * или неизвестно для какого (сохранённый ключ агента), — сказать, где берут нужный. */
+  if (address && !here && agentKey === null) {
+    say(L.keySource()?.key === 'personal'
+      ? 'This registers your personal key, which stops working on /mcp on the date shown in the cabinet.'
+      : `This registers the saved agent key ending …${key.slice(-4)}, which reads only the place it was made for.`);
+    say(`For ${project}, ${agentKeyWhere(L)}:`);
     say(`  ${c('0;36', `gitmir lab add --project ${project} --key <agent key>`)}`);
+    console.log('');
+  }
+  /* Без --project — общая запись на все проекты. Одна строка: личные ключи на /mcp
+   * кончаются, и место лучше назвать. Даты в клиенте нет — её назначает кабинет. */
+  if (!address) {
+    say(`Older personal keys stop working on /mcp on the date shown in the cabinet; connect from a project instead: ${c('0;36', `gitmir lab ${sub} --project <id> --key <agent key>`)}`);
     console.log('');
   }
 
@@ -819,11 +845,12 @@ const HELP = `
 
     gitmir lab          is Intelligence connected, and what can it read
     gitmir lab status   the keys on this machine, by their last four, and what uses each
-    gitmir lab <key>    save your personal key from lab.gitmir.com/account/access
+    gitmir lab <key>    save your personal key, for the Local Connector, from lab.gitmir.com/account/me
     gitmir lab add      let your assistant ask Intelligence directly
     gitmir lab add --project <id> [--key <agent key>]
                         start from that project, in this folder only;
                         --key saves the agent key made on it first
+                        (Connect an AI agent on that project or repository)
     gitmir lab add-here pin that to this folder (.mcp.json, key kept out of it)
     gitmir lab forget   remove both saved keys
     gitmir log [n]      the last n lines the server printed

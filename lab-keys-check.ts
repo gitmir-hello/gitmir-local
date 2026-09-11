@@ -102,6 +102,9 @@ const C: any = await import(pathToFileURL(path.join(ROOT, 'lib', 'connector.js')
 
 /* ---- помощники ------------------------------------------------------------------- */
 const SENTENCE = 'The Local Connector uses your personal key, not an agent key: gitmir lab <your personal key>';
+// Отказ называет, где личный ключ: /account/access теперь только выбирает место агента.
+const WHERE = SENTENCE + ' — it is on ' + LAB + '/account/me';
+const HOST = new URL(LAB).host;
 const put = (d: any, mode = 0o600) => { fs.rmSync(KEYFILE, { force: true }); fs.writeFileSync(KEYFILE, JSON.stringify(d), { mode }); };
 const file = () => { try { return JSON.parse(fs.readFileSync(KEYFILE, 'utf8')); } catch { return null; } };
 const mode600 = () => process.platform === 'win32' || (fs.statSync(KEYFILE).mode & 0o777) === 0o600;
@@ -172,11 +175,11 @@ put({ agentKey: K2 });
   const a = await during(() => L.ask('gitmir_projects'));
   ok('ask("gitmir_projects") sends Bearer K2', sentOnlyWith(a.sent, K2, 1), tails(a.sent));
   const f = await during(() => C.fetchConnector());
-  ok('fetchConnector() sends nothing and answers the personal-key sentence',
-    f.sent.length === 0 && f.result.ok === false && f.result.error === SENTENCE, tails(f.sent) + ' ' + JSON.stringify(f.result));
+  ok('fetchConnector() sends nothing and answers the personal-key sentence, naming /account/me',
+    f.sent.length === 0 && f.result.ok === false && f.result.error === WHERE, tails(f.sent) + ' ' + JSON.stringify(f.result));
   const r = await during(() => C.run({ project: 'acme-web' }));
   ok('run() sends nothing, starts nothing and answers the same sentence',
-    r.sent.length === 0 && r.result.ok === false && r.result.error === SENTENCE, JSON.stringify(r.result));
+    r.sent.length === 0 && r.result.ok === false && r.result.error === WHERE, JSON.stringify(r.result));
   ok('key() is null, and connected() is still true', L.key() === null && L.connected() === true);
 }
 
@@ -256,6 +259,49 @@ put({ key: K1 });
   ok('no key text reaches stdout (or stderr)', leaks(r.stdout + r.stderr).length === 0, leaks(r.stdout + r.stderr).join(', '));
 }
 
+/* Подсказки о ключе: ключ агента делают внутри проекта или репозитория, личный — на
+ * /account/me, а даты конца личных ключей в клиенте нет (её назначает кабинет). */
+const ISO_DATE = /\b20\d\d-\d\d-\d\d\b/;
+const HINT = `use a key made for that project or repository: open it on ${HOST} and press Connect an AI agent`;
+
+section('the key hints: lab add --project, lab add, and lab with no key');
+put({ key: K1 });
+{
+  const r = await gitmir(['lab', 'add', '--project', 'acme-web']);
+  ok('lab add --project acme-web exits 0 and quotes the project address', r.code === 0
+    && r.stdout.includes(`"${LAB}/mcp?project=acme-web"`), r.stdout + r.stderr);
+  ok('it says where a key for that place is made', r.stdout.includes(HINT), r.stdout);
+  ok('it says the personal key stops on /mcp, with no date', r.stdout.includes('stops working on /mcp on the date shown in the cabinet')
+    && !ISO_DATE.test(r.stdout), r.stdout);
+  ok('no key text reaches stdout', leaks(r.stdout + r.stderr).length === 0);
+}
+put({ key: K1 });
+{
+  const r = await gitmir(['lab', 'add']);
+  const line = r.stdout.split('\n').find((l) => l.includes('Older personal keys stop working on /mcp')) || '';
+  ok('lab add without --project adds one line on older personal keys, with no date, suggesting --project', r.code === 0
+    && line.includes('on the date shown in the cabinet') && line.includes('gitmir lab add --project <id>') && !ISO_DATE.test(r.stdout), r.stdout);
+}
+put({ agentKey: K2 });
+{
+  const r = await gitmir(['lab', 'add', '--project', 'acme-web']);
+  ok('with a saved agent key, lab add --project says it reads only its own place and where to make another',
+    r.code === 0 && r.stdout.includes(`agent key ending …${K2.slice(-4)}`) && r.stdout.includes(HINT), r.stdout);
+  ok('no key text reaches stdout', leaks(r.stdout + r.stderr).length === 0);
+}
+fs.rmSync(KEYFILE, { force: true });
+{
+  const r = await gitmir(['lab']);
+  ok('lab with no key sends people to Connect an AI agent, and names /account/me for the Local Connector', r.code === 0
+    && r.stdout.includes('Connect an AI agent') && r.stdout.includes(`${LAB}/account/me`) && r.sent.length === 0, r.stdout);
+}
+put({ key: K1 });
+{
+  const r = await gitmir(['lab']);
+  ok('lab when connected names /account/me for the Local Connector', r.code === 0
+    && r.stdout.includes(`personal key is on ${LAB}/account/me`) && r.stdout.includes(HINT), r.stdout);
+}
+
 section('gitmir lab status');
 put({ key: K1, agentKey: K2 });
 {
@@ -280,7 +326,7 @@ put({ agentKey: K2 });
 {
   const r = await gitmir(['lab', 'status']);
   ok('with only an agent key, the Local Connector is said to need the personal key', r.code === 0
-    && lineWith(r.stdout, K2).includes('assistants (/mcp and /view)') && r.stdout.includes(SENTENCE), r.stdout);
+    && lineWith(r.stdout, K2).includes('assistants (/mcp and /view)') && r.stdout.includes(WHERE), r.stdout);
   ok('no key text reaches stdout', leaks(r.stdout + r.stderr).length === 0);
 }
 

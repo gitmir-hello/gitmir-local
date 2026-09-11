@@ -21,8 +21,13 @@ Reading a product and working out what it does is what Intelligence is for, and 
 procedures that do it are not in this repository. Your assistant asks Intelligence
 directly over MCP: what something is, what depends on it, what a change would reach.
 
-Register its endpoint alongside the local one — `https://lab.gitmir.com/mcp`, with the
-key from [your account](https://lab.gitmir.com/account/access) as a bearer token. The
+Register its endpoint alongside the local one, with a key made for the project or
+repository the assistant works on: open that place on lab.gitmir.com and press **Connect an
+AI agent**. [lab.gitmir.com/account/access](https://lab.gitmir.com/account/access) lists the
+projects and repositories you can connect an agent to. The key is shown once and reads only
+that place. It goes as a bearer token to the address the page gives, kept in quotes —
+`"https://lab.gitmir.com/mcp?project=<id>"` — or `gitmir lab add --project <id> --key <agent key>`
+registers it for you, at Claude Code's `local` scope. The
 [local MCP server](MCP.md) is a different server and answers different questions: the
 queue, the findings, the approvals in this repository.
 
